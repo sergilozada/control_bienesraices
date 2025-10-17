@@ -1,0 +1,457 @@
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { 
+  signInWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged,
+  User as FirebaseUser,
+  createUserWithEmailAndPassword
+} from 'firebase/auth';
+import { 
+  collection, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  doc, 
+  getDocs, 
+  query, 
+  where, 
+  onSnapshot,
+  orderBy,
+  Timestamp
+} from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
+
+interface User {
+  id: string;
+  username: string;
+  role: 'admin' | 'full' | 'readonly';
+  email: string;
+}
+
+interface Client {
+  id: string;
+  nombre1: string;
+  nombre2?: string;
+  dni1: string;
+  dni2?: string;
+  celular1?: string;
+  celular2?: string;
+  email1?: string;
+  email2?: string;
+  manzana: string;
+  lote: string;
+  metraje: number;
+  montoTotal: number;
+  formaPago: 'contado' | 'cuotas';
+  inicial?: number;
+  numeroCuotas?: number;
+  fechaRegistro: string;
+  cuotas?: Cuota[];
+  userId: string; // Para asociar con el usuario
+}
+
+interface Cuota {
+  numero: number;
+  vencimiento: string;
+  monto: number;
+  mora: number;
+  total: number;
+  fechaPago?: string;
+  estado: 'pendiente' | 'pagado' | 'vencido';
+  voucher?: string | string[];
+  boleta?: string | string[];
+}
+
+interface AuthContextType {
+  user: User | null;
+  firebaseUser: FirebaseUser | null;
+  clients: Client[];
+  selectedClientId: string | null;
+  loading: boolean;
+  setSelectedClientId: (id: string | null) => void;
+  formatLocalISO: (date?: Date | string) => string;
+  parseLocalDate: (iso: string) => Date;
+  login: (email: string, password: string) => Promise<boolean>;
+  logout: () => Promise<void>;
+  addClient: (client: Omit<Client, 'id' | 'fechaRegistro' | 'cuotas' | 'userId'>) => Promise<boolean>;
+  updateClient: (id: string, client: Partial<Client>) => Promise<void>;
+  deleteClient: (id: string) => Promise<void>;
+  generateCuotas: (clientId: string) => Promise<void>;
+  updateCuota: (clientId: string, cuotaIndex: number, cuota: Partial<Cuota>) => Promise<void>;
+  calculateMora: (vencimiento: string, monto: number) => number;
+  searchClients: (manzana: string, lote: string, dniNombre?: string) => Client[];
+  markCuotaAsPaid: (clientId: string, cuotaIndex: number, fechaPago: string) => Promise<void>;
+  updateCuotaAmount: (clientId: string, newAmount: number) => Promise<void>;
+  updateCuotaDates: (clientId: string, cuotaIndex: number, newDate: string) => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
+
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Usuarios predeterminados con emails para Firebase
+  const defaultUsers: { [key: string]: Omit<User, 'id'> } = {
+    'admin@bienesraices.com': { username: 'admin', role: 'admin', email: 'admin@bienesraices.com' },
+    'usuario@bienesraices.com': { username: 'usuario', role: 'full', email: 'usuario@bienesraices.com' },
+    'readonly@bienesraices.com': { username: 'readonly', role: 'readonly', email: 'readonly@bienesraices.com' }
+  };
+
+  // Escuchar cambios de autenticación
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setFirebaseUser(firebaseUser);
+      
+      if (firebaseUser) {
+        // Buscar datos del usuario en los usuarios predeterminados
+        const userData = defaultUsers[firebaseUser.email || ''];
+        if (userData) {
+          setUser({
+            id: firebaseUser.uid,
+            ...userData
+          });
+        }
+      } else {
+        setUser(null);
+        setClients([]);
+      }
+      
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Escuchar cambios en los clientes cuando el usuario está autenticado
+  useEffect(() => {
+    if (!firebaseUser) {
+      setClients([]);
+      return;
+    }
+
+    const clientsQuery = query(
+      collection(db, 'clients'),
+      where('userId', '==', firebaseUser.uid),
+      orderBy('fechaRegistro', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(clientsQuery, (snapshot) => {
+      const clientsData: Client[] = [];
+      snapshot.forEach((doc) => {
+        clientsData.push({
+          id: doc.id,
+          ...doc.data()
+        } as Client);
+      });
+      setClients(clientsData);
+    });
+
+    return () => unsubscribe();
+  }, [firebaseUser]);
+
+  const login = async (email: string, password: string): Promise<boolean> => {
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      return true;
+    } catch (error) {
+      console.error('Error de login:', error);
+      return false;
+    }
+  };
+
+  const logout = async (): Promise<void> => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error('Error de logout:', error);
+    }
+  };
+
+  const addClient = async (clientData: Omit<Client, 'id' | 'fechaRegistro' | 'cuotas' | 'userId'>): Promise<boolean> => {
+    if (!firebaseUser) return false;
+
+    try {
+      // Verificar si ya existe un cliente con la misma manzana y lote
+      const existingQuery = query(
+        collection(db, 'clients'),
+        where('userId', '==', firebaseUser.uid),
+        where('manzana', '==', clientData.manzana),
+        where('lote', '==', clientData.lote)
+      );
+      
+      const existingDocs = await getDocs(existingQuery);
+      
+      if (!existingDocs.empty) {
+        return false; // Ya existe
+      }
+
+      const newClient: Omit<Client, 'id'> = {
+        ...clientData,
+        userId: firebaseUser.uid,
+        fechaRegistro: new Date().toISOString().split('T')[0],
+        cuotas: []
+      };
+      
+      const docRef = await addDoc(collection(db, 'clients'), newClient);
+      
+      // Generar cuotas
+      setTimeout(() => generateCuotas(docRef.id), 100);
+      
+      return true;
+    } catch (error) {
+      console.error('Error al agregar cliente:', error);
+      return false;
+    }
+  };
+
+  const updateClient = async (id: string, clientData: Partial<Client>): Promise<void> => {
+    try {
+      const clientRef = doc(db, 'clients', id);
+      await updateDoc(clientRef, clientData);
+    } catch (error) {
+      console.error('Error al actualizar cliente:', error);
+    }
+  };
+
+  const deleteClient = async (id: string): Promise<void> => {
+    try {
+      await deleteDoc(doc(db, 'clients', id));
+    } catch (error) {
+      console.error('Error al eliminar cliente:', error);
+    }
+  };
+
+  const getLastDayOfMonth = (year: number, month: number): number => {
+    return new Date(year, month + 1, 0).getDate();
+  };
+
+  const parseLocalDate = (iso: string) => {
+    if (!iso) return new Date();
+    const parts = iso.toString().split('-');
+    if (parts.length >= 3) {
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      const d = parseInt(parts[2].slice(0,2), 10);
+      return new Date(y, m, d);
+    }
+    return new Date(iso);
+  };
+
+  const formatLocalISO = (date?: Date | string) => {
+    let d: Date;
+    if (!date) d = new Date();
+    else if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}/.test(date)) d = parseLocalDate(date);
+    else d = new Date(date as any);
+
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const generateCuotas = async (clientId: string): Promise<void> => {
+    const client = clients.find(c => c.id === clientId);
+    if (!client) return;
+
+    try {
+      const cuotas: Cuota[] = [];
+      const fechaRegistro = new Date(client.fechaRegistro);
+      
+      // Agregar cuota inicial (número 0)
+      if (client.inicial && client.inicial > 0) {
+        cuotas.push({
+          numero: 0,
+          vencimiento: client.fechaRegistro,
+          monto: client.inicial,
+          mora: 0,
+          total: client.inicial,
+          estado: 'pendiente'
+        });
+      }
+
+      // Generar cuotas mensuales
+      if (client.numeroCuotas && client.numeroCuotas > 0) {
+        const montoFinanciar = client.montoTotal - (client.inicial || 0);
+        const montoCuota = Math.floor((montoFinanciar / client.numeroCuotas) * 100) / 100;
+        
+        for (let i = 0; i < client.numeroCuotas; i++) {
+          const fechaVencimiento = new Date(fechaRegistro.getFullYear(), fechaRegistro.getMonth() + i + 1, 1);
+          const ultimoDia = getLastDayOfMonth(fechaVencimiento.getFullYear(), fechaVencimiento.getMonth());
+          fechaVencimiento.setDate(ultimoDia);
+          
+          const esUltimaCuota = i === client.numeroCuotas - 1;
+          const monto = esUltimaCuota ? 
+            montoFinanciar - (montoCuota * (client.numeroCuotas - 1)) : 
+            montoCuota;
+          
+          cuotas.push({
+            numero: i + 1,
+            vencimiento: formatLocalISO(fechaVencimiento),
+            monto: monto,
+            mora: 0,
+            total: monto,
+            estado: 'pendiente'
+          });
+        }
+      }
+      
+      await updateClient(clientId, { cuotas });
+    } catch (error) {
+      console.error('Error al generar cuotas:', error);
+    }
+  };
+
+  const updateCuota = async (clientId: string, cuotaIndex: number, cuotaData: Partial<Cuota>): Promise<void> => {
+    const client = clients.find(c => c.id === clientId);
+    if (!client || !client.cuotas) return;
+
+    try {
+      const updatedCuotas = [...client.cuotas];
+      updatedCuotas[cuotaIndex] = { ...updatedCuotas[cuotaIndex], ...cuotaData };
+      
+      await updateClient(clientId, { cuotas: updatedCuotas });
+    } catch (error) {
+      console.error('Error al actualizar cuota:', error);
+    }
+  };
+
+  const markCuotaAsPaid = async (clientId: string, cuotaIndex: number, fechaPago: string): Promise<void> => {
+    const client = clients.find(c => c.id === clientId);
+    if (!client || !client.cuotas) return;
+
+    try {
+      const updatedCuotas = [...client.cuotas];
+      const cuota = updatedCuotas[cuotaIndex];
+      
+      let mora = 0;
+      if (cuota.numero === 0) mora = 0;
+      else if (typeof cuota.mora === 'number' && cuota.mora > 0) mora = cuota.mora;
+      else mora = calculateMora(cuota.vencimiento, cuota.monto);
+
+      const fechaPagoISO = formatLocalISO(fechaPago);
+
+      updatedCuotas[cuotaIndex] = {
+        ...cuota,
+        fechaPago: fechaPagoISO,
+        estado: 'pagado',
+        mora,
+        total: cuota.monto + mora
+      };
+      
+      await updateClient(clientId, { cuotas: updatedCuotas });
+    } catch (error) {
+      console.error('Error al marcar cuota como pagada:', error);
+    }
+  };
+
+  const updateCuotaAmount = async (clientId: string, newAmount: number): Promise<void> => {
+    const client = clients.find(c => c.id === clientId);
+    if (!client || !client.cuotas) return;
+
+    try {
+      const cuotas = [...client.cuotas];
+      const numeroCuotas = cuotas.filter(c => c.numero > 0).length;
+      
+      // Actualizar todas las cuotas excepto la última y la inicial
+      for (let i = 0; i < cuotas.length; i++) {
+        if (cuotas[i].numero > 0 && cuotas[i].numero < numeroCuotas) {
+          cuotas[i].monto = newAmount;
+          cuotas[i].total = newAmount + cuotas[i].mora;
+        }
+      }
+      
+      // Calcular monto de la última cuota
+      if (numeroCuotas > 0) {
+        const montoFinanciar = client.montoTotal - (client.inicial || 0);
+        const montoUltimasCuotas = newAmount * (numeroCuotas - 1);
+        const montoUltimaCuota = montoFinanciar - montoUltimasCuotas;
+        
+        const ultimaCuotaIndex = cuotas.findIndex(c => c.numero === numeroCuotas);
+        if (ultimaCuotaIndex !== -1) {
+          cuotas[ultimaCuotaIndex].monto = montoUltimaCuota;
+          cuotas[ultimaCuotaIndex].total = montoUltimaCuota + cuotas[ultimaCuotaIndex].mora;
+        }
+      }
+      
+      await updateClient(clientId, { cuotas });
+    } catch (error) {
+      console.error('Error al actualizar montos de cuotas:', error);
+    }
+  };
+
+  const updateCuotaDates = async (clientId: string, cuotaIndex: number, newDate: string): Promise<void> => {
+    await updateCuota(clientId, cuotaIndex, { vencimiento: newDate });
+  };
+
+  const calculateMora = (vencimiento: string, monto: number): number => {
+    const fechaVencimiento = parseLocalDate(vencimiento);
+    const hoy = new Date();
+    const diffTime = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate()).getTime() - new Date(fechaVencimiento.getFullYear(), fechaVencimiento.getMonth(), fechaVencimiento.getDate()).getTime();
+    const diasVencidos = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diasVencidos <= 5) return 0;
+    
+    let porcentajeMora = 0;
+    
+    if (diasVencidos <= 14) {
+      porcentajeMora = (diasVencidos - 5) * 0.01;
+    } else {
+      porcentajeMora += 9 * 0.01;
+      porcentajeMora += (diasVencidos - 14) * 0.015;
+    }
+    
+    return monto * porcentajeMora;
+  };
+
+  const searchClients = (manzana: string, lote: string, dniNombre?: string): Client[] => {
+    return clients.filter(client => {
+      const matchManzana = !manzana || client.manzana.toLowerCase().includes(manzana.toLowerCase());
+      const matchLote = !lote || client.lote.toLowerCase().includes(lote.toLowerCase());
+      const matchDniNombre = !dniNombre || 
+        client.dni1.includes(dniNombre) ||
+        client.nombre1.toLowerCase().includes(dniNombre.toLowerCase()) ||
+        (client.nombre2 && client.nombre2.toLowerCase().includes(dniNombre.toLowerCase()));
+      
+      return matchManzana && matchLote && matchDniNombre;
+    });
+  };
+
+  return (
+    <AuthContext.Provider value={{
+      user,
+      firebaseUser,
+      clients,
+      selectedClientId,
+      loading,
+      setSelectedClientId,
+      formatLocalISO,
+      parseLocalDate,
+      login,
+      logout,
+      addClient,
+      updateClient,
+      deleteClient,
+      generateCuotas,
+      updateCuota,
+      calculateMora,
+      searchClients,
+      markCuotaAsPaid,
+      updateCuotaAmount,
+      updateCuotaDates
+    }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
