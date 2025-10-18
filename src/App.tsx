@@ -128,8 +128,26 @@ const App = () => (
       <ErrorBoundary>
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<WelcomeScreen />} />
-            <Route path="*" element={<WelcomeScreen />} />
+            {/* Default to Firebase mode (shows Firebase login if not authenticated) */}
+            <Route
+              path="/"
+              element={
+                <FirebaseAuthProvider>
+                  <FirebaseAppContent />
+                </FirebaseAuthProvider>
+              }
+            />
+            {/* Keep welcome/mode selector available at /welcome */}
+            <Route path="/welcome" element={<WelcomeScreen />} />
+            {/* Fallback: also land on Firebase mode */}
+            <Route
+              path="*"
+              element={
+                <FirebaseAuthProvider>
+                  <FirebaseAppContent />
+                </FirebaseAuthProvider>
+              }
+            />
           </Routes>
         </BrowserRouter>
       </ErrorBoundary>
