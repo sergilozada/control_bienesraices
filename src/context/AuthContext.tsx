@@ -96,13 +96,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setClients(JSON.parse(savedClients));
     }
     
-    // Si no hay usuario guardado, iniciar sesión automáticamente como usuario 'usuario'
-    // Esto permite que la aplicación sea accesible sin pedir credenciales.
-    if (!savedUser) {
-      const guest = defaultUsers['usuario'];
-      setUser(guest);
-      localStorage.setItem('currentUser', JSON.stringify(guest));
-    }
+    // No auto-login: requerir credenciales explícitas
   }, []);
 
   useEffect(() => {
