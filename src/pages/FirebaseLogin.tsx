@@ -101,36 +101,7 @@ export default function FirebaseLogin() {
               </Button>
             </form>
             
-            <div className="mt-6 text-sm text-gray-600 text-center">
-              <p><strong>Usuarios de prueba (Firebase):</strong></p>
-              <div className="space-y-2 mt-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => fillCredentials('admin')}
-                  className="w-full text-xs"
-                >
-                  Admin: admin@bienesraices.com
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => fillCredentials('usuario')}
-                  className="w-full text-xs"
-                >
-                  Usuario: usuario@bienesraices.com
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => fillCredentials('readonly')}
-                  className="w-full text-xs"
-                >
-                  Solo lectura: readonly@bienesraices.com
-                </Button>
-              </div>
-              <p className="mt-2 text-xs">Contraseña para todos: password123</p>
-            </div>
+            {/* Removed public test accounts UI to avoid exposing credentials */}
           </CardContent>
         </Card>
       </div>

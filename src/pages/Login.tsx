@@ -84,12 +84,7 @@ export default function Login() {
               </Button>
             </form>
             
-            <div className="mt-6 text-sm text-gray-600 text-center">
-              <p><strong>Usuarios de prueba:</strong></p>
-              <p>Admin: admin / password123</p>
-              <p>Usuario: usuario / password123</p>
-              <p>Solo lectura: readonly / password123</p>
-            </div>
+            {/* Test accounts UI removed to avoid exposing credentials */}
           </CardContent>
         </Card>
       </div>
