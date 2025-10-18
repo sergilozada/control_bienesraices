@@ -65,7 +65,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    console.trace('AuthContext: useAuth called without provider');
+    throw new Error('useAuth (Local) must be used within a Local AuthProvider');
   }
   return context;
 };

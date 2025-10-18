@@ -13,6 +13,7 @@ import {
   deleteDoc, 
   doc, 
   getDocs, 
+  getDoc,
   query, 
   where, 
   onSnapshot,
@@ -90,7 +91,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    console.trace('FirebaseAuthContext: useAuth called without provider');
+    throw new Error('useAuth (Firebase) must be used within a Firebase AuthProvider');
   }
   return context;
 };
@@ -156,6 +158,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } as Client);
       });
       setClients(clientsData);
+
+      // Ensure cuotas are generated for any client that doesn't have them yet (race condition fix)
+      clientsData.forEach(c => {
+        if (!c.cuotas || c.cuotas.length === 0) {
+          // fire-and-forget; generateCuotas will fetch the client if necessary
+          generateCuotas(c.id).catch(err => console.error('generateCuotas error on snapshot:', err));
+        }
+      });
     });
 
     return () => unsubscribe();
@@ -262,7 +272,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const generateCuotas = async (clientId: string): Promise<void> => {
-    const client = clients.find(c => c.id === clientId);
+    let client = clients.find(c => c.id === clientId) as Client | undefined;
+
+    // If client is not yet in local state (race with onSnapshot), fetch it directly from Firestore
+    if (!client) {
+      try {
+        const clientDoc = await getDoc(doc(db, 'clients', clientId));
+        if (clientDoc.exists()) {
+          client = { id: clientDoc.id, ...(clientDoc.data() as any) } as Client;
+        }
+      } catch (err) {
+        console.error('Error fetching client for generateCuotas:', err);
+      }
+    }
+
     if (!client) return;
 
     try {

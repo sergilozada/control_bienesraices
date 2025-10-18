@@ -7,9 +7,11 @@ import { AuthProvider as FirebaseAuthProvider, useAuth as useFirebaseAuth } from
 import Login from './pages/Login';
 import FirebaseLogin from './pages/FirebaseLogin';
 import Dashboard from './pages/Dashboard';
+import FirebaseDashboard from './pages/FirebaseDashboard';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 const queryClient = new QueryClient();
 
@@ -58,8 +60,8 @@ function FirebaseAppContent() {
   if (!user) {
     return <FirebaseLogin />;
   }
-  
-  return <Dashboard />;
+
+  return <FirebaseDashboard />;
 }
 
 function WelcomeScreen() {
@@ -122,12 +124,14 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<WelcomeScreen />} />
-          <Route path="*" element={<WelcomeScreen />} />
-        </Routes>
-      </BrowserRouter>
+      <ErrorBoundary>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<WelcomeScreen />} />
+            <Route path="*" element={<WelcomeScreen />} />
+          </Routes>
+        </BrowserRouter>
+      </ErrorBoundary>
     </TooltipProvider>
   </QueryClientProvider>
 );

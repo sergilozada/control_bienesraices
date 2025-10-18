@@ -24,7 +24,8 @@ export default function FirebaseLogin() {
         setError('Email o contraseña incorrectos');
       }
     } catch (error) {
-      setError('Error al iniciar sesión. Intente nuevamente.');
+      console.error('Firebase login error:', error);
+      setError('Error al iniciar sesión. Revise la consola para más detalles.');
     } finally {
       setLoading(false);
     }
