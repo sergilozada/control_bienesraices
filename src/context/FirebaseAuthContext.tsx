@@ -20,7 +20,8 @@ import {
   orderBy,
   Timestamp
 } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import { auth, db, storage } from '@/lib/firebase';
+import { ref as storageRef, listAll, deleteObject } from 'firebase/storage';
 
 interface User {
   id: string;
@@ -243,6 +244,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const deleteClient = async (id: string): Promise<void> => {
     try {
+      // First delete storage files under clients/{id}/cuotas/** if any
+      try {
+        const listRef = storageRef(storage, `clients/${id}`);
+        const res = await listAll(listRef);
+        // delete files directly under this path
+        await Promise.all(res.items.map(itemRef => deleteObject(itemRef).catch(err => { console.warn('Error deleting storage file', err); })));
+        // listAll does not recursively list nested folders in older SDK; try to list each subfolder
+        await Promise.all(res.prefixes.map(async (pref) => {
+          try {
+            const subRes = await listAll(pref);
+            await Promise.all(subRes.items.map(it => deleteObject(it).catch(err => { console.warn('Error deleting nested file', err); })));
+          } catch (e) {
+            console.warn('Error listing nested prefix', e);
+          }
+        }));
+      } catch (err) {
+        console.warn('Error cleaning up storage for client', id, err);
+      }
+
       await deleteDoc(doc(db, 'clients', id));
     } catch (error) {
       console.error('Error al eliminar cliente:', error);

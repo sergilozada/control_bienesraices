@@ -850,7 +850,7 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
                                   <Button size="sm" variant="ghost" onClick={() => handleFileUpload(selectedClient, index, 'voucher')}>
                                     <Upload className="w-4 h-4" />
                                   </Button>
-                                  {cuota.voucher && (
+                                  {(Array.isArray(cuota.voucher) ? cuota.voucher.length > 0 : !!cuota.voucher) && (
                                     <>
                                       <Button size="sm" variant="ghost" onClick={() => openAllFiles(cuota.voucher)}>
                                         <Eye className="w-4 h-4" />
@@ -867,7 +867,7 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
                                   <Button size="sm" variant="ghost" onClick={() => handleFileUpload(selectedClient, index, 'boleta')}>
                                     <Upload className="w-4 h-4" />
                                   </Button>
-                                  {cuota.boleta && (
+                                  {(Array.isArray(cuota.boleta) ? cuota.boleta.length > 0 : !!cuota.boleta) && (
                                     <>
                                       <Button size="sm" variant="ghost" onClick={() => openAllFiles(cuota.boleta)}>
                                         <Eye className="w-4 h-4" />
