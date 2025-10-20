@@ -9,6 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Edit, Trash2, Eye, Upload, Download, FileText } from 'lucide-react';
 import { toast } from 'sonner';
+import { storage } from '@/lib/firebase';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
@@ -166,23 +168,37 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
 
   const handleFileUpload = (clientId: string, cuotaIndex: number, fileType: 'voucher' | 'boleta') => {
     const input = document.createElement('input');
-  input.type = 'file';
+    input.type = 'file';
     input.accept = 'image/*,application/pdf';
     input.multiple = true; // Permitir múltiples archivos
-    input.onchange = (e) => {
+    input.onchange = async (e) => {
       const files = (e.target as HTMLInputElement).files;
       if (files && files.length > 0) {
-        const fileUrls: string[] = [];
+        const uploadedUrls: string[] = [];
         for (let i = 0; i < files.length; i++) {
-          const fileUrl = URL.createObjectURL(files[i]);
-          fileUrls.push(fileUrl);
+          try {
+            const file = files[i];
+            // create a storage ref under clients/{clientId}/cuotas/{cuotaIndex}/{timestamp}_{filename}
+            const path = `clients/${clientId}/cuotas/${cuotaIndex}/${Date.now()}_${file.name}`;
+            const sRef = storageRef(storage, path);
+            // upload as bytes
+            const snapshot = await uploadBytes(sRef, file);
+            const url = await getDownloadURL(snapshot.ref);
+            uploadedUrls.push(url);
+          } catch (err) {
+            console.error('Error subiendo archivo:', err);
+            toast.error('Error subiendo uno o más archivos');
+          }
         }
-        // Concatenar con existentes si las hay
-        const client = clients.find(c => c.id === clientId);
-        const existing = client?.cuotas ? client.cuotas[cuotaIndex]?.[fileType] : undefined;
-        const merged = Array.isArray(existing) ? [...existing, ...fileUrls] : (existing ? [existing, ...fileUrls] : fileUrls);
-        updateCuota(clientId, cuotaIndex, { [fileType]: merged });
-        toast.success(`${files.length} ${fileType === 'voucher' ? 'voucher(s)' : 'boleta(s)'} subido(s) exitosamente`);
+
+        if (uploadedUrls.length > 0) {
+          // Concatenar con existentes si las hay
+          const client = clients.find(c => c.id === clientId);
+          const existing = client?.cuotas ? client.cuotas[cuotaIndex]?.[fileType] : undefined;
+          const merged = Array.isArray(existing) ? [...existing, ...uploadedUrls] : (existing ? [existing, ...uploadedUrls] : uploadedUrls);
+          updateCuota(clientId, cuotaIndex, { [fileType]: merged });
+          toast.success(`${uploadedUrls.length} ${fileType === 'voucher' ? 'voucher(s)' : 'boleta(s)'} subido(s) exitosamente`);
+        }
       }
     };
     input.click();

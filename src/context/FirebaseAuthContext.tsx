@@ -194,17 +194,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     try {
       // Verificar si ya existe un cliente con la misma manzana y lote
-      const existingQuery = query(
+      // Firestore equality queries are exact; to avoid issues with case/whitespace
+      // and eventual consistency, fetch user's clients and compare normalized strings locally.
+      const userClientsQuery = query(
         collection(db, 'clients'),
-        where('userId', '==', firebaseUser.uid),
-        where('manzana', '==', clientData.manzana),
-        where('lote', '==', clientData.lote)
+        where('userId', '==', firebaseUser.uid)
       );
-      
-      const existingDocs = await getDocs(existingQuery);
-      
-      if (!existingDocs.empty) {
-        return false; // Ya existe
+      const snapshot = await getDocs(userClientsQuery);
+      const normalizedNewManzana = (clientData.manzana || '').toString().trim().toLowerCase();
+      const normalizedNewLote = (clientData.lote || '').toString().trim().toLowerCase();
+
+      for (const d of snapshot.docs) {
+        const data = d.data() as any;
+        const man = (data.manzana || '').toString().trim().toLowerCase();
+        const lot = (data.lote || '').toString().trim().toLowerCase();
+        if (man === normalizedNewManzana && lot === normalizedNewLote) {
+          return false; // Ya existe
+        }
       }
 
       const newClient: Omit<Client, 'id'> = {
