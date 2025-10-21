@@ -208,14 +208,42 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
     if (!files) return;
     const arr = Array.isArray(files) ? files : [files];
     // Create a zip-like multiple download by triggering each file download sequentially
-    arr.forEach((url, i) => {
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${filenamePrefix}_${i}`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-    });
+    // For cross-origin URLs (Firebase Storage) the `download` attribute may be ignored.
+    // Fetch each file as a blob (CORS must allow GET), then create an object URL and force download.
+    (async () => {
+      for (let i = 0; i < arr.length; i++) {
+        const url = arr[i];
+        try {
+          const res = await fetch(url, { mode: 'cors' });
+          if (!res.ok) throw new Error(`Failed to fetch file: ${res.status}`);
+          const blob = await res.blob();
+          // try to get extension from content-type
+          const contentType = blob.type || '';
+          let ext = '';
+          if (contentType) {
+            const parts = contentType.split('/');
+            if (parts.length === 2) ext = '.' + parts[1].split('+')[0];
+          }
+          // fallback to extension from url
+          if (!ext) {
+            const m = url.match(/\.([a-zA-Z0-9]+)(?:\?|$)/);
+            if (m) ext = '.' + m[1];
+          }
+
+          const objUrl = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = objUrl;
+          a.download = `${filenamePrefix}_${i}${ext}`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(objUrl);
+        } catch (err) {
+          console.error('Error downloading file', err);
+          toast.error('Error al descargar uno o más archivos. Revise la consola.');
+        }
+      }
+    })();
   };
 
   const openAllFiles = (files: string | string[] | undefined) => {
