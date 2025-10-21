@@ -214,14 +214,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      const newClient: Omit<Client, 'id'> = {
+      // Build new client object but remove any undefined fields (Firestore rejects undefined)
+      const rawClient: Record<string, any> = {
         ...clientData,
         userId: firebaseUser.uid,
         fechaRegistro: new Date().toISOString().split('T')[0],
         cuotas: []
       };
-      
-      const docRef = await addDoc(collection(db, 'clients'), newClient);
+
+      const newClient: Record<string, any> = {};
+      Object.keys(rawClient).forEach((k) => {
+        const v = (rawClient as any)[k];
+        if (v !== undefined) newClient[k] = v;
+      });
+
+      const docRef = await addDoc(collection(db, 'clients'), newClient as any);
       
       // Generar cuotas
       setTimeout(() => generateCuotas(docRef.id), 100);
