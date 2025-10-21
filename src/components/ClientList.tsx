@@ -240,7 +240,19 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
           URL.revokeObjectURL(objUrl);
         } catch (err) {
           console.error('Error downloading file', err);
-          toast.error('Error al descargar uno o más archivos. Revise la consola.');
+          // Fallback: abrir en nueva pestaña para que el usuario pueda guardar manualmente
+          try {
+            const a = document.createElement('a');
+            a.href = url;
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            toast('No se pudo forzar la descarga por CORS; se ha abierto el archivo en una nueva pestaña. Use "Guardar como" para descargar.');
+          } catch (e) {
+            toast.error('Error al descargar uno o más archivos. Revise la consola.');
+          }
         }
       }
     })();
