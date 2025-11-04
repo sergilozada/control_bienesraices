@@ -61,6 +61,10 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
   const [editMoraValue, setEditMoraValue] = useState('');
   // Initialize paymentDate as local ISO (yyyy-MM-dd) to avoid timezone shifts
   const [paymentDate, setPaymentDate] = useState(formatLocalISO());
+  // Información bancaria reutilizable (evitar inconsistencias)
+  const bankAccountSoles = '38006500681006';
+  const bankCCI = '002-3801-0650-0681-00645';
+  const bankOwner = 'SEGUNDO TEOFILO LOZADA VILLEGAS';
 
   const getFilteredClients = () => {
     const today = new Date();
@@ -363,9 +367,9 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
     doc.setTextColor(0);
     const bankLines = [
       'N° DE CUENTA BCP',
-      'Soles: 380065006811006',
-      'CCI: 002-3801-0650-0681-00645',
-      'SEGUNDO TEOFILO LOZADA VILLEGAS'
+      `Soles: ${bankAccountSoles}`,
+      `CCI: ${bankCCI}`,
+      bankOwner
     ];
     // measure text width and height to draw a tight green box
     let maxBankTextWidth = 0;
@@ -603,9 +607,9 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
       infoHtml += `<td style="vertical-align:top;padding:8px;">
         <div style="display:inline-block;background:#c8e6c9;padding:8px;border-radius:2px;">
           <div style="font-size:12px;font-weight:600;">N° DE CUENTA BCP</div>
-          <div>Soles: 380065006811006</div>
-          <div>CCI: 002-3801-0650-0681-00645</div>
-          <div style="margin-top:6px;font-weight:bold;">SEGUNDO TEOFILO LOZADA VILLEGAS</div>
+          <div>Soles: ${bankAccountSoles}</div>
+          <div>CCI: ${bankCCI}</div>
+          <div style="margin-top:6px;font-weight:bold;">${bankOwner}</div>
         </div>
       </td>`;
       infoHtml += '</tr>';
