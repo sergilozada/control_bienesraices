@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Edit, Trash2, Eye, Upload, Download, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { storage } from '@/lib/firebase';
@@ -52,13 +53,14 @@ interface Cuota {
 }
 
 export default function ClientList({ filterType = 'all' }: ClientListProps) {
-  const { clients, deleteClient, updateCuota, calculateMora, markCuotaAsPaid, updateCuotaAmount, updateCuotaDates, selectedClientId, setSelectedClientId, formatLocalISO, parseLocalDate } = useAuth();
+  const { clients, deleteClient, updateClient, updateCuota, calculateMora, markCuotaAsPaid, updateCuotaAmount, updateCuotaDates, selectedClientId, setSelectedClientId, formatLocalISO, parseLocalDate } = useAuth();
   const [selectedClient, setSelectedClient] = useState<string | null>(selectedClientId || null);
   const [editingCuota, setEditingCuota] = useState<{ clientId: string; type: 'amount' | 'date'; cuotaIndex?: number } | null>(null);
   const [editMonto, setEditMonto] = useState('');
   const [editFecha, setEditFecha] = useState('');
   const [editingMora, setEditingMora] = useState<{ clientId: string; cuotaIndex: number } | null>(null);
   const [editMoraValue, setEditMoraValue] = useState('');
+  const [propagateDates, setPropagateDates] = useState(false);
   // Initialize paymentDate as local ISO (yyyy-MM-dd) to avoid timezone shifts
   const [paymentDate, setPaymentDate] = useState(formatLocalISO());
   // Información bancaria reutilizable (evitar inconsistencias)
@@ -150,18 +152,57 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
 
   const handleEditCuotaDate = () => {
     if (!editingCuota || editingCuota.type !== 'date' || editingCuota.cuotaIndex === undefined) return;
-    
+
     if (!editFecha) {
       toast.error('Ingrese una fecha válida');
       return;
     }
 
-    // Usar la fecha exacta sin conversiones que puedan cambiar el día
-    // Save exact date picked (format to yyyy-MM-dd) without timezone conversion
-    updateCuotaDates(editingCuota.clientId, editingCuota.cuotaIndex, formatLocalISO(editFecha));
-    setEditingCuota(null);
-    setEditFecha('');
-    toast.success('Fecha de vencimiento actualizada');
+    // Helper: add months preserving day-of-month where possible (cap to last day)
+    const addMonthsKeepingDay = (date: Date, months: number) => {
+      const y = date.getFullYear();
+      const m = date.getMonth();
+      const d = date.getDate();
+      const target = new Date(y, m + months, 1);
+      const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+      target.setDate(Math.min(d, lastDay));
+      return target;
+    };
+
+    (async () => {
+      try {
+        const client = clients.find(c => c.id === editingCuota.clientId);
+        if (!client || !client.cuotas) return;
+
+        const cuotaIdx = editingCuota.cuotaIndex as number;
+        const baseISO = formatLocalISO(editFecha);
+
+        if (!propagateDates) {
+          // Only update the single cuota
+          await Promise.resolve(updateCuotaDates(editingCuota.clientId, cuotaIdx, baseISO));
+        } else {
+          // Update this cuota and all following cuotas to be monthly spaced from base date
+          const baseDate = parseLocalDate(baseISO);
+          const updatedCuotas = client.cuotas.map((c, idx) => {
+            if (idx < cuotaIdx) return c;
+            const monthsToAdd = idx - cuotaIdx;
+            const targetDate = addMonthsKeepingDay(baseDate, monthsToAdd);
+            return { ...c, vencimiento: formatLocalISO(targetDate) };
+          });
+
+          // Single write to update all cuotas at once
+          await updateClient(editingCuota.clientId, { cuotas: updatedCuotas });
+        }
+
+        setEditingCuota(null);
+        setEditFecha('');
+        setPropagateDates(false);
+        toast.success('Fecha(s) de vencimiento actualizada(s)');
+      } catch (err) {
+        console.error('Error actualizando fechas de cuotas:', err);
+        toast.error('Error al actualizar fechas de cuotas');
+      }
+    })();
   };
 
   const handleMarkAsPaid = (clientId: string, cuotaIndex: number) => {
@@ -994,6 +1035,10 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
                   value={editFecha}
                   onChange={(e) => setEditFecha(e.target.value)}
                 />
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox id="propagateDates" checked={propagateDates} onCheckedChange={(v) => setPropagateDates(!!v)} />
+                <Label htmlFor="propagateDates">Aplicar esta fecha a las cuotas siguientes (mensualmente)</Label>
               </div>
               <div className="flex justify-end space-x-2">
                 <Button variant="outline" onClick={() => setEditingCuota(null)}>
