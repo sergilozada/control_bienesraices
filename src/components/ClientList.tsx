@@ -181,13 +181,22 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
           // Only update the single cuota
           await Promise.resolve(updateCuotaDates(editingCuota.clientId, cuotaIdx, baseISO));
         } else {
-          // Update this cuota and all following cuotas to be monthly spaced from base date
+          // Update this cuota and all following cuotas.
+          // The selected cuota gets the exact date chosen by the user (baseISO).
+          // All subsequent cuotas should use the LAST DAY of each successive month.
           const baseDate = parseLocalDate(baseISO);
           const updatedCuotas = client.cuotas.map((c, idx) => {
             if (idx < cuotaIdx) return c;
             const monthsToAdd = idx - cuotaIdx;
-            const targetDate = addMonthsKeepingDay(baseDate, monthsToAdd);
-            return { ...c, vencimiento: formatLocalISO(targetDate) };
+            if (monthsToAdd === 0) {
+              return { ...c, vencimiento: baseISO };
+            }
+            // compute last day of (base month + monthsToAdd)
+            const year = baseDate.getFullYear();
+            const month = baseDate.getMonth() + monthsToAdd;
+            const lastDay = new Date(year, month + 1, 0).getDate();
+            const target = new Date(year, month, lastDay);
+            return { ...c, vencimiento: formatLocalISO(target) };
           });
 
           // Single write to update all cuotas at once
