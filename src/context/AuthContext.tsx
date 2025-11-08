@@ -255,10 +255,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const cuota = updatedCuotas[cuotaIndex];
         // Para iniciales no hay mora
         // Preferir mora manual si la cuota ya tiene un valor de mora > 0
-        let mora = 0;
-        if (cuota.numero === 0) mora = 0;
-        else if (typeof cuota.mora === 'number' && cuota.mora > 0) mora = cuota.mora;
-        else mora = calculateMora(cuota.vencimiento, cuota.monto);
+  let mora = 0;
+  if (cuota.numero === 0) mora = 0;
+  // Preferir mora manual incluso si es 0; si no existe, calcularla
+  else if (typeof cuota.mora === 'number') mora = cuota.mora;
+  else mora = calculateMora(cuota.vencimiento, cuota.monto);
 
         // Guardar fecha de pago como ISO local para evitar desfases
         const fechaPagoISO = formatLocalISO(fechaPago);

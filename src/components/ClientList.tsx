@@ -147,11 +147,16 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
       let lastIndex = cuotasCopy.findIndex(c => c.numero === numeroCuotas);
       if (lastIndex === -1) lastIndex = cuotasCopy.length - 1;
 
-      const diff = newMonto - oldMonto;
-      // Add diff to last cuota
-      if (lastIndex >= 0 && lastIndex < cuotasCopy.length) {
+      // Compute leftover: if newMonto is less than oldMonto, leftover is positive and should be
+      // added to the last cuota. If newMonto > oldMonto, we subtract the difference from last cuota.
+      const diffToMove = oldMonto - newMonto; // positive => add to last, negative => subtract from last
+
+      // Only apply movement to a different cuota than the one being edited
+      if (lastIndex >= 0 && lastIndex < cuotasCopy.length && lastIndex !== idx && diffToMove !== 0) {
         const last = cuotasCopy[lastIndex];
-        last.monto = (last.monto || 0) + diff;
+        const newLastMonto = (last.monto || 0) + diffToMove;
+        // Ensure last cuota monto doesn't go negative
+        last.monto = Math.max(0, Math.round((newLastMonto + Number.EPSILON) * 100) / 100);
         last.total = last.monto + (last.mora ?? 0);
       }
 
@@ -501,7 +506,8 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
 
       // Prepare table rows, computing mora (manual or calculated) and total per row
       const rows = (client.cuotas || []).map((cuota) => {
-        const moraDisplayed = (typeof cuota.mora === 'number' && cuota.mora > 0) ? cuota.mora : calculateMora(cuota.vencimiento, cuota.monto);
+        // If mora is explicitly set (including 0) prefer that value; otherwise calculate it
+        const moraDisplayed = (typeof cuota.mora === 'number') ? cuota.mora : calculateMora(cuota.vencimiento, cuota.monto);
         const totalForRow = cuota.monto + moraDisplayed;
         return [
           cuota.numero === 0 ? 'Inicial' : String(cuota.numero),
@@ -943,9 +949,8 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
                         {client.cuotas.map((cuota, index) => {
                           // Para iniciales no hay mora
                           const moraCalculada = cuota.numero === 0 ? 0 : calculateMora(cuota.vencimiento, cuota.monto);
-                          // Preferir mora manual si existe (>0)
-                          const moraManual = (cuota.mora ?? 0) > 0 ? cuota.mora : 0;
-                          const displayedMora = moraManual > 0 ? moraManual : moraCalculada;
+                          // Preferir mora manual incluso si es 0; si no existe, usar la calculada
+                          const displayedMora = (typeof cuota.mora === 'number') ? cuota.mora : moraCalculada;
                           // Mostrar siempre monto + mora (manual o calculada) para reflejar la deuda actual
                           const totalDisplayed = cuota.monto + displayedMora;
                           
@@ -957,19 +962,19 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
                                 </Badge>
                               </TableCell>
                               <TableCell>{formatDate(cuota.vencimiento)}</TableCell>
-                              <TableCell className="flex items-center space-x-2">
+                              <TableCell className="flex items-center space-x-2 whitespace-nowrap min-w-[160px]">
                                 <span>S/ {cuota.monto.toFixed(2)}</span>
                                 <Button size="sm" variant="ghost" onClick={() => { setEditingCuota({ clientId: selectedClient!, type: 'amount', cuotaIndex: index }); setEditMonto(cuota.monto.toFixed(2)); }}>
                                   <Edit className="w-4 h-4" />
                                 </Button>
                               </TableCell>
-                              <TableCell className="flex items-center space-x-2">
+                              <TableCell className="flex items-center space-x-2 whitespace-nowrap min-w-[140px]">
                                 <span>S/ {displayedMora.toFixed(2)}</span>
                                 <Button size="sm" variant="ghost" onClick={() => { setEditingMora({ clientId: selectedClient!, cuotaIndex: index }); setEditMoraValue(displayedMora.toFixed(2)); }}>
                                   <Edit className="w-4 h-4" />
                                 </Button>
                               </TableCell>
-                              <TableCell>S/ {totalDisplayed.toFixed(2)}</TableCell>
+                              <TableCell className="whitespace-nowrap min-w-[120px]">S/ {totalDisplayed.toFixed(2)}</TableCell>
                               <TableCell className="whitespace-nowrap">
                                 {cuota.fechaPago ? formatDate(cuota.fechaPago) : '-'}
                               </TableCell>

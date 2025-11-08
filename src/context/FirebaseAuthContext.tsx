@@ -104,6 +104,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  // a small key to force re-subscribing to Firestore listeners on error
+  const [listenerKey, setListenerKey] = useState(0);
 
   // Usuarios predeterminados con emails para Firebase
   const defaultUsers: { [key: string]: Omit<User, 'id'> } = {
@@ -150,6 +152,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       orderBy('fechaRegistro', 'desc')
     );
 
+    // Subscribe with an error callback so we can handle transient network/protocol errors
     const unsubscribe = onSnapshot(clientsQuery, (snapshot) => {
       const clientsData: Client[] = [];
       snapshot.forEach((doc) => {
@@ -167,10 +170,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           generateCuotas(c.id).catch(err => console.error('generateCuotas error on snapshot:', err));
         }
       });
+    }, (error) => {
+      // Common: net::ERR_QUIC_PROTOCOL_ERROR originates from the browser/network layer when
+      // attempting HTTP/3/QUIC connections to Firestore's listen channel. It's usually transient
+      // or caused by a proxy/VPN/antivirus. Log and attempt to re-subscribe after a short backoff.
+      console.error('onSnapshot error (will retry):', error);
+      // schedule a re-subscribe by bumping listenerKey after a short delay
+      setTimeout(() => setListenerKey(k => k + 1), 1500);
     });
 
     return () => unsubscribe();
-  }, [firebaseUser]);
+  }, [firebaseUser, listenerKey]);
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
@@ -391,10 +401,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const updatedCuotas = [...client.cuotas];
       const cuota = updatedCuotas[cuotaIndex];
       
-      let mora = 0;
-      if (cuota.numero === 0) mora = 0;
-      else if (typeof cuota.mora === 'number' && cuota.mora > 0) mora = cuota.mora;
-      else mora = calculateMora(cuota.vencimiento, cuota.monto);
+  let mora = 0;
+  if (cuota.numero === 0) mora = 0;
+  // If mora was explicitly set (including 0) prefer that value; otherwise calculate it
+  else if (typeof cuota.mora === 'number') mora = cuota.mora;
+  else mora = calculateMora(cuota.vencimiento, cuota.monto);
 
       const fechaPagoISO = formatLocalISO(fechaPago);
 
