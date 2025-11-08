@@ -44,8 +44,10 @@ interface Cuota {
   numero: number;
   vencimiento: string;
   monto: number;
-  mora: number;
-  total: number;
+  mora?: number;
+  total?: number;
+  // If true, mora was set manually by a user and should be respected even if 0
+  manualMora?: boolean;
   fechaPago?: string;
   estado: 'pendiente' | 'pagado' | 'vencido';
   voucher?: string | string[];
@@ -187,10 +189,10 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
     if (isNaN(v) || v < 0) { toast.error('Ingrese un monto válido para la mora'); return; }
     // Update the specific cuota mora and total
     const client = clients.find(c => c.id === editingMora.clientId);
-    if (!client || !client.cuotas) return;
-    const cuota = client.cuotas[editingMora.cuotaIndex];
-    if (!cuota) return;
-    updateCuota(editingMora.clientId, editingMora.cuotaIndex, { mora: v, total: cuota.monto + v });
+  if (!client || !client.cuotas) return;
+  const cuota = client.cuotas[editingMora.cuotaIndex];
+  if (!cuota) return;
+  updateCuota(editingMora.clientId, editingMora.cuotaIndex, { mora: v, total: cuota.monto + v, manualMora: true });
     setEditingMora(null);
     setEditMoraValue('');
     toast.success('Mora actualizada');
@@ -506,8 +508,8 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
 
       // Prepare table rows, computing mora (manual or calculated) and total per row
       const rows = (client.cuotas || []).map((cuota) => {
-        // If mora is explicitly set (including 0) prefer that value; otherwise calculate it
-        const moraDisplayed = (typeof cuota.mora === 'number') ? cuota.mora : calculateMora(cuota.vencimiento, cuota.monto);
+        // If mora was manually set (manualMora === true) prefer that value; otherwise calculate it
+        const moraDisplayed = (typeof cuota.mora === 'number' && (cuota as any).manualMora === true) ? cuota.mora : calculateMora(cuota.vencimiento, cuota.monto);
         const totalForRow = cuota.monto + moraDisplayed;
         return [
           cuota.numero === 0 ? 'Inicial' : String(cuota.numero),
@@ -736,12 +738,14 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
       (client.cuotas || []).forEach(cuota => {
         const vouchersCount = Array.isArray(cuota.voucher) ? cuota.voucher.length : (cuota.voucher ? 1 : 0);
         const boletasCount = Array.isArray(cuota.boleta) ? cuota.boleta.length : (cuota.boleta ? 1 : 0);
+        const moraDisplayed = (typeof cuota.mora === 'number' && (cuota as any).manualMora === true) ? cuota.mora : calculateMora(cuota.vencimiento, cuota.monto);
+        const totalDisplayed = cuota.total ?? (cuota.monto + moraDisplayed);
         tableHtml += `<tr>
           <td>${cuota.numero === 0 ? 'Inicial' : cuota.numero}</td>
           <td>${formatDate(cuota.vencimiento)}</td>
           <td>S/ ${cuota.monto.toFixed(2)}</td>
-          <td>S/ ${(cuota.mora ?? 0).toFixed(2)}</td>
-          <td>S/ ${(cuota.total ?? (cuota.monto + (cuota.mora ?? 0))).toFixed(2)}</td>
+          <td>S/ ${moraDisplayed.toFixed(2)}</td>
+          <td>S/ ${totalDisplayed.toFixed(2)}</td>
           <td>${cuota.fechaPago ? formatDate(cuota.fechaPago) : ''}</td>
           <td>${cuota.estado}</td>
           <td>${vouchersCount > 0 ? vouchersCount + ' voucher(s)' : ''}</td>
@@ -874,7 +878,7 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
       {/* Modal de cuotas */}
       {selectedClient && (
         <Dialog open={true} onOpenChange={() => { setSelectedClient(null); setSelectedClientId(null); }}>
-          <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
+    <DialogContent className="w-[95vw] max-w-[1200px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center justify-between">
                 <span>Detalle de Cuotas</span>
@@ -929,8 +933,7 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
                   </div>
                   
                   <div className="w-full overflow-x-auto">
-                    {/* Use table-fixed and explicit column widths to avoid wrapping and shifting */}
-                    <Table className="min-w-full table-fixed">
+                    <Table className="min-w-full">
                       <TableHeader>
                         <TableRow>
                           <TableHead>N°</TableHead>
@@ -950,8 +953,8 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
                         {client.cuotas.map((cuota, index) => {
                           // Para iniciales no hay mora
                           const moraCalculada = cuota.numero === 0 ? 0 : calculateMora(cuota.vencimiento, cuota.monto);
-                          // Preferir mora manual incluso si es 0; si no existe, usar la calculada
-                          const displayedMora = (typeof cuota.mora === 'number') ? cuota.mora : moraCalculada;
+                          // Preferir mora manual solo si fue marcada como manual (manualMora === true)
+                          const displayedMora = (typeof cuota.mora === 'number' && (cuota as any).manualMora === true) ? cuota.mora : moraCalculada;
                           // Mostrar siempre monto + mora (manual o calculada) para reflejar la deuda actual
                           const totalDisplayed = cuota.monto + displayedMora;
                           

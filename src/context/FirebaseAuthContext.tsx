@@ -56,8 +56,9 @@ interface Cuota {
   numero: number;
   vencimiento: string;
   monto: number;
-  mora: number;
-  total: number;
+  mora?: number;
+  total?: number;
+  manualMora?: boolean;
   fechaPago?: string;
   estado: 'pendiente' | 'pagado' | 'vencido';
   voucher?: string | string[];
@@ -401,11 +402,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const updatedCuotas = [...client.cuotas];
       const cuota = updatedCuotas[cuotaIndex];
       
-  let mora = 0;
-  if (cuota.numero === 0) mora = 0;
-  // If mora was explicitly set (including 0) prefer that value; otherwise calculate it
-  else if (typeof cuota.mora === 'number') mora = cuota.mora;
-  else mora = calculateMora(cuota.vencimiento, cuota.monto);
+    let mora = 0;
+    if (cuota.numero === 0) mora = 0;
+    // If mora was manually set (manualMora === true) prefer that value (even 0); otherwise calculate it
+    else if (typeof cuota.mora === 'number' && (cuota as any).manualMora === true) mora = cuota.mora;
+    else mora = calculateMora(cuota.vencimiento, cuota.monto);
 
       const fechaPagoISO = formatLocalISO(fechaPago);
 

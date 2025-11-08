@@ -38,8 +38,9 @@ interface Cuota {
   numero: number;
   vencimiento: string;
   monto: number;
-  mora: number;
-  total: number;
+  mora?: number;
+  total?: number;
+  manualMora?: boolean;
   fechaPago?: string;
   estado: 'pendiente' | 'pagado' | 'vencido';
   voucher?: string | string[];
