@@ -194,14 +194,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         // Agregar cuota inicial (número 0)
         if (client.inicial && client.inicial > 0) {
+          // Don't set `mora` so calculateMora will apply unless user overrides later
           cuotas.push({
             numero: 0,
             vencimiento: client.fechaRegistro, // La inicial vence el mismo día del registro
             monto: client.inicial,
-            mora: 0,
             total: client.inicial,
             estado: 'pendiente'
-          });
+          } as any);
         }
 
         // Generar cuotas mensuales
@@ -220,14 +220,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               montoFinanciar - (montoCuota * (client.numeroCuotas - 1)) : 
               montoCuota;
             
+            // don't set mora so that the UI calculates mora automatically until a manual value is set
             cuotas.push({
               numero: i + 1,
               vencimiento: formatLocalISO(fechaVencimiento),
               monto: monto,
-              mora: 0,
               total: monto,
               estado: 'pendiente'
-            });
+            } as any);
           }
         }
         

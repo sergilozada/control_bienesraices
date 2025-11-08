@@ -929,20 +929,21 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
                   </div>
                   
                   <div className="w-full overflow-x-auto">
-                    <Table className="min-w-full">
+                    {/* Use table-fixed and explicit column widths to avoid wrapping and shifting */}
+                    <Table className="min-w-full table-fixed">
                       <TableHeader>
                         <TableRow>
                           <TableHead>N°</TableHead>
                           <TableHead>Vencimiento</TableHead>
-                          <TableHead>Monto</TableHead>
-                          <TableHead>Mora</TableHead>
-                          <TableHead>Total</TableHead>
-                          <TableHead>Fecha Pago</TableHead>
-                          <TableHead>Estado</TableHead>
-                          <TableHead>Acción</TableHead>
-                          <TableHead>Voucher</TableHead>
-                          <TableHead>Boleta</TableHead>
-                          <TableHead>Editar</TableHead>
+                          <TableHead className="w-32">Monto</TableHead>
+                          <TableHead className="w-28">Mora</TableHead>
+                          <TableHead className="w-28">Total</TableHead>
+                          <TableHead className="w-32">Fecha Pago</TableHead>
+                          <TableHead className="w-28">Estado</TableHead>
+                          <TableHead className="w-28">Acción</TableHead>
+                          <TableHead className="w-24">Voucher</TableHead>
+                          <TableHead className="w-24">Boleta</TableHead>
+                          <TableHead className="w-20">Editar</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
