@@ -124,11 +124,52 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
     if (!editingCuota || editingCuota.type !== 'amount') return;
     
     const newMonto = parseFloat(editMonto);
-    if (isNaN(newMonto) || newMonto <= 0) {
+    if (isNaN(newMonto) || newMonto < 0) {
       toast.error('Ingrese un monto válido');
       return;
     }
+    // If a specific cuota index is provided, update only that cuota and move the difference to the final cuota
+    if (editingCuota.cuotaIndex !== undefined) {
+      const client = clients.find(c => c.id === editingCuota.clientId);
+      if (!client || !client.cuotas) {
+        toast.error('Cliente o cuotas no encontrados');
+        return;
+      }
 
+      const cuotasCopy = client.cuotas.map(c => ({ ...c }));
+      const idx = editingCuota.cuotaIndex;
+      const oldMonto = cuotasCopy[idx]?.monto ?? 0;
+      cuotasCopy[idx].monto = newMonto;
+      cuotasCopy[idx].total = newMonto + (cuotasCopy[idx].mora ?? 0);
+
+      // Find last cuota index (highest numero > 0)
+      const numeroCuotas = cuotasCopy.filter(c => c.numero > 0).length;
+      let lastIndex = cuotasCopy.findIndex(c => c.numero === numeroCuotas);
+      if (lastIndex === -1) lastIndex = cuotasCopy.length - 1;
+
+      const diff = newMonto - oldMonto;
+      // Add diff to last cuota
+      if (lastIndex >= 0 && lastIndex < cuotasCopy.length) {
+        const last = cuotasCopy[lastIndex];
+        last.monto = (last.monto || 0) + diff;
+        last.total = last.monto + (last.mora ?? 0);
+      }
+
+      // Single write (replace cuotas array)
+      updateClient(editingCuota.clientId, { cuotas: cuotasCopy })
+        .then(() => {
+          setEditingCuota(null);
+          setEditMonto('');
+          toast.success('Monto de cuota actualizado y diferencia aplicada a la última cuota');
+        })
+        .catch(err => {
+          console.error('Error actualizando cuota individual:', err);
+          toast.error('Error al actualizar cuota');
+        });
+      return;
+    }
+
+    // Otherwise update regular cuotas amounts (existing behaviour)
     updateCuotaAmount(editingCuota.clientId, newMonto);
     setEditingCuota(null);
     setEditMonto('');
@@ -232,8 +273,15 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
         for (let i = 0; i < files.length; i++) {
           try {
             const file = files[i];
-            // create a storage ref under clients/{clientId}/cuotas/{cuotaIndex}/{timestamp}_{filename}
-            const path = `clients/${clientId}/cuotas/${cuotaIndex}/${Date.now()}_${file.name}`;
+              // create a storage ref under clients/{clientId}/cuotas/{cuotaIndex}/{original filename + unique suffix}
+              // Keep original filename but append a short unique code to avoid overwrites
+              const originalName = file.name;
+              const dotIndex = originalName.lastIndexOf('.');
+              const baseName = dotIndex !== -1 ? originalName.slice(0, dotIndex) : originalName;
+              const ext = dotIndex !== -1 ? originalName.slice(dotIndex) : '';
+              const uniqueCode = `${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+              const finalName = `${baseName}_${uniqueCode}${ext}`;
+              const path = `clients/${clientId}/cuotas/${cuotaIndex}/${finalName}`;
             const sRef = storageRef(storage, path);
             // upload as bytes
             const snapshot = await uploadBytes(sRef, file);
@@ -909,7 +957,12 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
                                 </Badge>
                               </TableCell>
                               <TableCell>{formatDate(cuota.vencimiento)}</TableCell>
-                              <TableCell>S/ {cuota.monto.toFixed(2)}</TableCell>
+                              <TableCell className="flex items-center space-x-2">
+                                <span>S/ {cuota.monto.toFixed(2)}</span>
+                                <Button size="sm" variant="ghost" onClick={() => { setEditingCuota({ clientId: selectedClient!, type: 'amount', cuotaIndex: index }); setEditMonto(cuota.monto.toFixed(2)); }}>
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                              </TableCell>
                               <TableCell className="flex items-center space-x-2">
                                 <span>S/ {displayedMora.toFixed(2)}</span>
                                 <Button size="sm" variant="ghost" onClick={() => { setEditingMora({ clientId: selectedClient!, cuotaIndex: index }); setEditMoraValue(displayedMora.toFixed(2)); }}>
@@ -940,21 +993,21 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
                                 )}
                               </TableCell>
                               <TableCell>
-                                <div className="flex items-center space-x-2">
-                                  <Button size="sm" variant="ghost" onClick={() => handleFileUpload(selectedClient, index, 'voucher')}>
-                                    <Upload className="w-4 h-4" />
-                                  </Button>
-                                  {(Array.isArray(cuota.voucher) ? cuota.voucher.length > 0 : !!cuota.voucher) && (
-                                    <>
-                                      <Button size="sm" variant="ghost" onClick={() => openAllFiles(cuota.voucher)}>
-                                        <Eye className="w-4 h-4" />
-                                      </Button>
-                                      <Button size="sm" variant="ghost" onClick={() => downloadAllFiles(cuota.voucher, `voucher_${client.dni1 || 'file'}_${index}`)}>
-                                        <Download className="w-4 h-4" />
-                                      </Button>
-                                    </>
-                                  )}
-                                </div>
+                                                <div className="flex items-center space-x-2">
+                                                  <Button size="sm" variant="ghost" onClick={() => handleFileUpload(selectedClient, index, 'voucher')}>
+                                                    <Upload className="w-4 h-4" />
+                                                  </Button>
+                                                  {(Array.isArray(cuota.voucher) ? cuota.voucher.length > 0 : !!cuota.voucher) && (
+                                                    <>
+                                                      <Button size="sm" variant="ghost" onClick={() => openAllFiles(cuota.voucher)}>
+                                                        <Eye className="w-4 h-4" />
+                                                      </Button>
+                                                      <Button size="sm" variant="ghost" onClick={() => downloadAllFiles(cuota.voucher, `voucher_${client.dni1 || 'file'}_${index}`)}>
+                                                        <Download className="w-4 h-4" />
+                                                      </Button>
+                                                    </>
+                                                  )}
+                                                </div>
                               </TableCell>
                               <TableCell>
                                 <div className="flex items-center space-x-2">
@@ -1075,6 +1128,7 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
                 <Input
                   type="number"
                   step="0.01"
+                  min={0}
                   value={editMoraValue}
                   onChange={(e) => setEditMoraValue(e.target.value)}
                   placeholder="Ingrese el nuevo monto de mora"
