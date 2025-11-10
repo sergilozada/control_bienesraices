@@ -147,10 +147,14 @@ export default function StatsView({ showReport = false }: StatsViewProps) {
         } else {
           clientesAlContado++;
           // For contado clients, attribute an ingreso based on client.inicial if present, otherwise use montoTotal
-          const contadoAmount = client.inicial ?? client.montoTotal ?? 0;
+          const contadoAmount = Number(client.inicial ?? client.montoTotal ?? 0);
           ingresosPorContado += contadoAmount;
           totalIngresos += contadoAmount;
         }
+
+        // Ensure montoTotal/inicial are numeric for display
+        const montoTotalNumeric = Number(client.montoTotal ?? client.inicial ?? 0);
+        const inicialNumeric = Number((initialCuota && typeof initialCuota.monto === 'number') ? initialCuota.monto : (client.inicial || 0));
 
         detalleRegistros.push({
           // Use the initial vencimiento if present as the "fecha" shown in the report; otherwise fallback to fechaRegistro
@@ -160,8 +164,8 @@ export default function StatsView({ showReport = false }: StatsViewProps) {
           manzana: client.manzana,
           lote: client.lote,
           formaPago: client.formaPago,
-          montoTotal: client.montoTotal ?? client.inicial ?? 0,
-          inicial: (initialCuota && typeof initialCuota.monto === 'number') ? initialCuota.monto : (client.inicial || 0)
+          montoTotal: montoTotalNumeric,
+          inicial: inicialNumeric
         });
       }
     });
