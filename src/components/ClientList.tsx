@@ -878,7 +878,7 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
       {/* Modal de cuotas */}
       {selectedClient && (
         <Dialog open={true} onOpenChange={() => { setSelectedClient(null); setSelectedClientId(null); }}>
-    <DialogContent className="w-[95vw] max-w-[1200px] max-h-[90vh] overflow-y-auto">
+  <DialogContent className="w-[98vw] max-w-[1400px] max-h-[92vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center justify-between">
                 <span>Detalle de Cuotas</span>
@@ -932,8 +932,8 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
                     />
                   </div>
                   
-                  <div className="w-full overflow-x-auto">
-                    <Table className="min-w-full">
+                  <div className="w-full">
+                    <Table className="w-full">
                       <TableHeader>
                         <TableRow>
                           <TableHead>N°</TableHead>
