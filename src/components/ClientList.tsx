@@ -508,8 +508,9 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
 
       // Prepare table rows, computing mora (manual or calculated) and total per row
       const rows = (client.cuotas || []).map((cuota) => {
-        // If mora was manually set (manualMora === true) prefer that value; otherwise calculate it
-        const moraDisplayed = (typeof cuota.mora === 'number' && (cuota as any).manualMora === true) ? cuota.mora : calculateMora(cuota.vencimiento, cuota.monto);
+        // Match UI behaviour: initial cuota (numero === 0) must show mora = 0.
+        // If mora was manually set (manualMora === true) prefer that value; otherwise calculate it.
+        const moraDisplayed = cuota.numero === 0 ? 0 : ((typeof cuota.mora === 'number' && (cuota as any).manualMora === true) ? cuota.mora : calculateMora(cuota.vencimiento, cuota.monto));
         const totalForRow = cuota.monto + moraDisplayed;
         return [
           cuota.numero === 0 ? 'Inicial' : String(cuota.numero),
@@ -738,7 +739,8 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
       (client.cuotas || []).forEach(cuota => {
         const vouchersCount = Array.isArray(cuota.voucher) ? cuota.voucher.length : (cuota.voucher ? 1 : 0);
         const boletasCount = Array.isArray(cuota.boleta) ? cuota.boleta.length : (cuota.boleta ? 1 : 0);
-        const moraDisplayed = (typeof cuota.mora === 'number' && (cuota as any).manualMora === true) ? cuota.mora : calculateMora(cuota.vencimiento, cuota.monto);
+        // Match UI: initial cuota has no mora
+        const moraDisplayed = cuota.numero === 0 ? 0 : ((typeof cuota.mora === 'number' && (cuota as any).manualMora === true) ? cuota.mora : calculateMora(cuota.vencimiento, cuota.monto));
         const totalDisplayed = cuota.total ?? (cuota.monto + moraDisplayed);
         tableHtml += `<tr>
           <td>${cuota.numero === 0 ? 'Inicial' : cuota.numero}</td>
