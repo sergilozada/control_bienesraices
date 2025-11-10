@@ -146,8 +146,8 @@ export default function StatsView({ showReport = false }: StatsViewProps) {
           }
         } else {
           clientesAlContado++;
-          // For contado clients, attribute an ingreso based on client.inicial if present, otherwise use montoTotal
-          const contadoAmount = Number(client.inicial ?? client.montoTotal ?? 0);
+          // For contado clients, attribute an ingreso based on client.montoTotal (full price). If montoTotal missing, fallback to inicial.
+          const contadoAmount = Number(client.montoTotal ?? client.inicial ?? 0);
           ingresosPorContado += contadoAmount;
           totalIngresos += contadoAmount;
         }
