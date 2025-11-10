@@ -933,20 +933,20 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
                   </div>
                   
                   <div className="w-full">
-                    <Table className="w-full">
+                    <Table className="min-w-full table-fixed">
                       <TableHeader>
                         <TableRow>
                           <TableHead>N°</TableHead>
                           <TableHead>Vencimiento</TableHead>
-                          <TableHead className="w-32">Monto</TableHead>
-                          <TableHead className="w-28">Mora</TableHead>
-                          <TableHead className="w-28">Total</TableHead>
-                          <TableHead className="w-32">Fecha Pago</TableHead>
-                          <TableHead className="w-28">Estado</TableHead>
-                          <TableHead className="w-28">Acción</TableHead>
-                          <TableHead className="w-24">Voucher</TableHead>
-                          <TableHead className="w-24">Boleta</TableHead>
-                          <TableHead className="w-20">Editar</TableHead>
+                          <TableHead className="w-36 text-left">Monto</TableHead>
+                          <TableHead className="w-28 text-left">Mora</TableHead>
+                          <TableHead className="w-28 text-left">Total</TableHead>
+                          <TableHead className="w-36 text-left">Fecha Pago</TableHead>
+                          <TableHead className="w-28 text-left">Estado</TableHead>
+                          <TableHead className="w-28 text-left">Acción</TableHead>
+                          <TableHead className="w-24 text-left">Voucher</TableHead>
+                          <TableHead className="w-24 text-left">Boleta</TableHead>
+                          <TableHead className="w-20 text-left">Editar</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -966,19 +966,23 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
                                 </Badge>
                               </TableCell>
                               <TableCell>{formatDate(cuota.vencimiento)}</TableCell>
-                              <TableCell className="flex items-center space-x-2 whitespace-nowrap min-w-[160px]">
-                                <span>S/ {cuota.monto.toFixed(2)}</span>
-                                <Button size="sm" variant="ghost" onClick={() => { setEditingCuota({ clientId: selectedClient!, type: 'amount', cuotaIndex: index }); setEditMonto(cuota.monto.toFixed(2)); }}>
-                                  <Edit className="w-4 h-4" />
-                                </Button>
+                              <TableCell className="w-36 whitespace-nowrap">
+                                <div className="flex items-center justify-start space-x-2">
+                                  <span>S/ {cuota.monto.toFixed(2)}</span>
+                                  <Button size="sm" variant="ghost" onClick={() => { setEditingCuota({ clientId: selectedClient!, type: 'amount', cuotaIndex: index }); setEditMonto(cuota.monto.toFixed(2)); }}>
+                                    <Edit className="w-4 h-4" />
+                                  </Button>
+                                </div>
                               </TableCell>
-                              <TableCell className="flex items-center space-x-2 whitespace-nowrap min-w-[140px]">
-                                <span>S/ {displayedMora.toFixed(2)}</span>
-                                <Button size="sm" variant="ghost" onClick={() => { setEditingMora({ clientId: selectedClient!, cuotaIndex: index }); setEditMoraValue(displayedMora.toFixed(2)); }}>
-                                  <Edit className="w-4 h-4" />
-                                </Button>
+                              <TableCell className="w-28 whitespace-nowrap">
+                                <div className="flex items-center justify-start space-x-2">
+                                  <span>S/ {displayedMora.toFixed(2)}</span>
+                                  <Button size="sm" variant="ghost" onClick={() => { setEditingMora({ clientId: selectedClient!, cuotaIndex: index }); setEditMoraValue(displayedMora.toFixed(2)); }}>
+                                    <Edit className="w-4 h-4" />
+                                  </Button>
+                                </div>
                               </TableCell>
-                              <TableCell className="whitespace-nowrap min-w-[120px]">S/ {totalDisplayed.toFixed(2)}</TableCell>
+                              <TableCell className="w-28 whitespace-nowrap">S/ {totalDisplayed.toFixed(2)}</TableCell>
                               <TableCell className="whitespace-nowrap">
                                 {cuota.fechaPago ? formatDate(cuota.fechaPago) : '-'}
                               </TableCell>
