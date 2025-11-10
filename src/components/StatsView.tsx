@@ -125,43 +125,53 @@ export default function StatsView({ showReport = false }: StatsViewProps) {
     const detalleRegistros: RegistroDetalle[] = [];
 
     clients.forEach(client => {
-      const fechaRegistro = new Date(client.fechaRegistro);
-      
-      if (fechaRegistro.getMonth() === month && fechaRegistro.getFullYear() === year) {
+      // Determine the effective entry date for the client.
+      // Prefer the fechaPago of the initial cuota (numero === 0) if present — that indicates when the client actually entered.
+      const initialCuota = client.cuotas ? client.cuotas.find(c => c.numero === 0) : undefined;
+      const entryDate = (initialCuota && initialCuota.fechaPago) ? new Date(initialCuota.fechaPago) : new Date(client.fechaRegistro);
+
+      if (entryDate.getMonth() === month && entryDate.getFullYear() === year) {
         totalClientes++;
-        
+
         if (client.formaPago === 'cuotas') {
           clientesConCuotas++;
-          if (client.inicial) {
-            ingresosPorIniciales += client.inicial;
-            totalIngresos += client.inicial;
+          // Count ingresos por iniciales only if the initial cuota was actually paid in this month
+          if (initialCuota && initialCuota.fechaPago) {
+            // use cuota.monto if available, otherwise fallback to client.inicial
+            const inicialAmount = typeof initialCuota.monto === 'number' ? initialCuota.monto : (client.inicial || 0);
+            ingresosPorIniciales += inicialAmount;
+            totalIngresos += inicialAmount;
           }
         } else {
           clientesAlContado++;
-          
-          // Calcular ingresos reales por contado basado en cuotas pagadas
+
+          // For contado clients, sum amounts that were paid in this month (cuota.fechaPago inside month/year)
           let ingresosContadoReal = 0;
           if (client.cuotas) {
             client.cuotas.forEach(cuota => {
-              if (cuota.estado === 'pagado') {
-                ingresosContadoReal += cuota.monto;
+              if (cuota.fechaPago) {
+                const fp = new Date(cuota.fechaPago);
+                if (fp.getMonth() === month && fp.getFullYear() === year && cuota.estado === 'pagado') {
+                  ingresosContadoReal += cuota.monto;
+                }
               }
             });
           }
-          
+
           ingresosPorContado += ingresosContadoReal;
           totalIngresos += ingresosContadoReal;
         }
 
         detalleRegistros.push({
-          fecha: client.fechaRegistro,
+          // Use the initial payment date if present as the "fecha" shown in the report; otherwise fallback to fechaRegistro
+          fecha: (initialCuota && initialCuota.fechaPago) ? initialCuota.fechaPago : client.fechaRegistro,
           nombre: `${client.nombre1} ${client.nombre2 || ''}`.trim(),
           dni: client.dni1,
           manzana: client.manzana,
           lote: client.lote,
           formaPago: client.formaPago,
           montoTotal: client.montoTotal,
-          inicial: client.inicial || 0
+          inicial: (initialCuota && typeof initialCuota.monto === 'number') ? initialCuota.monto : (client.inicial || 0)
         });
       }
     });
