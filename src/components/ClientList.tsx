@@ -944,8 +944,8 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
                           <TableHead className="w-36 text-left">Fecha Pago</TableHead>
                           <TableHead className="w-28 text-left">Estado</TableHead>
                           <TableHead className="w-28 text-left">Acción</TableHead>
-                          <TableHead className="w-24 text-left">Voucher</TableHead>
-                          <TableHead className="w-24 text-left">Boleta</TableHead>
+                          <TableHead className="w-40 text-left">Voucher</TableHead>
+                          <TableHead className="w-40 text-left">Boleta</TableHead>
                           <TableHead className="w-20 text-left">Editar</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -1005,24 +1005,24 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
                                   </Button>
                                 )}
                               </TableCell>
-                              <TableCell>
-                                                <div className="flex items-center space-x-2">
-                                                  <Button size="sm" variant="ghost" onClick={() => handleFileUpload(selectedClient, index, 'voucher')}>
-                                                    <Upload className="w-4 h-4" />
-                                                  </Button>
-                                                  {(Array.isArray(cuota.voucher) ? cuota.voucher.length > 0 : !!cuota.voucher) && (
-                                                    <>
-                                                      <Button size="sm" variant="ghost" onClick={() => openAllFiles(cuota.voucher)}>
-                                                        <Eye className="w-4 h-4" />
-                                                      </Button>
-                                                      <Button size="sm" variant="ghost" onClick={() => downloadAllFiles(cuota.voucher, `voucher_${client.dni1 || 'file'}_${index}`)}>
-                                                        <Download className="w-4 h-4" />
-                                                      </Button>
-                                                    </>
-                                                  )}
-                                                </div>
+                              <TableCell className="w-40 whitespace-nowrap">
+                                <div className="flex items-center space-x-2">
+                                  <Button size="sm" variant="ghost" onClick={() => handleFileUpload(selectedClient, index, 'voucher')}>
+                                    <Upload className="w-4 h-4" />
+                                  </Button>
+                                  {(Array.isArray(cuota.voucher) ? cuota.voucher.length > 0 : !!cuota.voucher) && (
+                                    <>
+                                      <Button size="sm" variant="ghost" onClick={() => openAllFiles(cuota.voucher)}>
+                                        <Eye className="w-4 h-4" />
+                                      </Button>
+                                      <Button size="sm" variant="ghost" onClick={() => downloadAllFiles(cuota.voucher, `voucher_${client.dni1 || 'file'}_${index}`)}>
+                                        <Download className="w-4 h-4" />
+                                      </Button>
+                                    </>
+                                  )}
+                                </div>
                               </TableCell>
-                              <TableCell>
+                              <TableCell className="w-40 whitespace-nowrap">
                                 <div className="flex items-center space-x-2">
                                   <Button size="sm" variant="ghost" onClick={() => handleFileUpload(selectedClient, index, 'boleta')}>
                                     <Upload className="w-4 h-4" />
