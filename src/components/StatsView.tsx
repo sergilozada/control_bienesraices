@@ -42,7 +42,7 @@ interface RegistroDetalle {
 }
 
 export default function StatsView({ showReport = false }: StatsViewProps) {
-  const { clients } = useAuth();
+  const { clients, parseLocalDate, formatLocalISO } = useAuth();
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
@@ -127,8 +127,8 @@ export default function StatsView({ showReport = false }: StatsViewProps) {
     clients.forEach(client => {
       // Determine the effective entry date for the client.
       // Use the vencimiento of the initial cuota (numero === 0) if present — the report should be grouped by that vencimiento.
-      const initialCuota = client.cuotas ? client.cuotas.find(c => c.numero === 0) : undefined;
-      const entryDate = (initialCuota && initialCuota.vencimiento) ? new Date(initialCuota.vencimiento) : new Date(client.fechaRegistro);
+  const initialCuota = client.cuotas ? client.cuotas.find(c => c.numero === 0) : undefined;
+  const entryDate = (initialCuota && initialCuota.vencimiento) ? parseLocalDate(initialCuota.vencimiento) : parseLocalDate(client.fechaRegistro);
 
       if (entryDate.getMonth() === month && entryDate.getFullYear() === year) {
         totalClientes++;
@@ -154,13 +154,13 @@ export default function StatsView({ showReport = false }: StatsViewProps) {
 
         detalleRegistros.push({
           // Use the initial vencimiento if present as the "fecha" shown in the report; otherwise fallback to fechaRegistro
-          fecha: (initialCuota && initialCuota.vencimiento) ? initialCuota.vencimiento : client.fechaRegistro,
+          fecha: (initialCuota && initialCuota.vencimiento) ? formatLocalISO(initialCuota.vencimiento) : formatLocalISO(client.fechaRegistro),
           nombre: `${client.nombre1} ${client.nombre2 || ''}`.trim(),
           dni: client.dni1,
           manzana: client.manzana,
           lote: client.lote,
           formaPago: client.formaPago,
-          montoTotal: client.montoTotal,
+          montoTotal: client.montoTotal ?? client.inicial ?? 0,
           inicial: (initialCuota && typeof initialCuota.monto === 'number') ? initialCuota.monto : (client.inicial || 0)
         });
       }
@@ -249,11 +249,24 @@ export default function StatsView({ showReport = false }: StatsViewProps) {
         // Tabla de registros (detalle)
         if (report.detalleRegistros.length > 0) {
           // Build a robust tableData ensuring numeric fields are always strings
+          // Helper to format date as dd/mm/yyyy using local parsing to avoid timezone shifts
+          const formatDate = (iso: string) => {
+            try {
+              const d = parseLocalDate(iso);
+              const day = String(d.getDate()).padStart(2, '0');
+              const month = String(d.getMonth() + 1).padStart(2, '0');
+              const year = d.getFullYear();
+              return `${day}/${month}/${year}`;
+            } catch (e) {
+              return iso;
+            }
+          };
+
           const tableData = report.detalleRegistros.map((registro) => {
             const montoVal = Number((registro as any).montoTotal ?? (registro as any).monto ?? 0);
             const inicialVal = Number((registro as any).inicial ?? 0);
             return [
-              new Date(registro.fecha).toLocaleDateString(),
+              formatDate(registro.fecha),
               String(registro.nombre ?? ''),
               String(registro.dni ?? ''),
               String(registro.manzana ?? ''),
@@ -615,22 +628,35 @@ export default function StatsView({ showReport = false }: StatsViewProps) {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {report.detalleRegistros.map((registro, index) => (
-                      <TableRow key={index}>
-                        <TableCell>{new Date(registro.fecha).toLocaleDateString()}</TableCell>
-                        <TableCell>{registro.nombre}</TableCell>
-                        <TableCell>{registro.dni}</TableCell>
-                        <TableCell>{registro.manzana}</TableCell>
-                        <TableCell>{registro.lote}</TableCell>
-                        <TableCell>
-                          <Badge variant={registro.formaPago === 'contado' ? 'default' : 'secondary'}>
-                            {registro.formaPago}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>S/ {registro.montoTotal.toFixed(2)}</TableCell>
-                        <TableCell>S/ {registro.inicial.toFixed(2)}</TableCell>
-                      </TableRow>
-                    ))}
+                    {report.detalleRegistros.map((registro, index) => {
+                      const d = (() => {
+                        try {
+                          const dt = parseLocalDate(registro.fecha);
+                          const day = String(dt.getDate()).padStart(2, '0');
+                          const month = String(dt.getMonth() + 1).padStart(2, '0');
+                          const year = dt.getFullYear();
+                          return `${day}/${month}/${year}`;
+                        } catch (e) {
+                          return registro.fecha;
+                        }
+                      })();
+                      return (
+                        <TableRow key={index}>
+                          <TableCell>{d}</TableCell>
+                          <TableCell>{registro.nombre}</TableCell>
+                          <TableCell>{registro.dni}</TableCell>
+                          <TableCell>{registro.manzana}</TableCell>
+                          <TableCell>{registro.lote}</TableCell>
+                          <TableCell>
+                            <Badge variant={registro.formaPago === 'contado' ? 'default' : 'secondary'}>
+                              {registro.formaPago}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>S/ {registro.montoTotal.toFixed(2)}</TableCell>
+                          <TableCell>S/ {registro.inicial.toFixed(2)}</TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
