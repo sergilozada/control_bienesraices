@@ -50,8 +50,9 @@ interface Cuota {
   manualMora?: boolean;
   fechaPago?: string;
   estado: 'pendiente' | 'pagado' | 'vencido';
-  voucher?: string | string[];
-  boleta?: string | string[];
+  // Support legacy string URLs and the newer objects that store original filename
+  voucher?: string | string[] | { url: string; name?: string } | Array<{ url: string; name?: string }>;
+  boleta?: string | string[] | { url: string; name?: string } | Array<{ url: string; name?: string }>;
 }
 
 export default function ClientList({ filterType = 'all' }: ClientListProps) {
@@ -276,37 +277,43 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
     input.onchange = async (e) => {
       const files = (e.target as HTMLInputElement).files;
       if (files && files.length > 0) {
-        const uploadedUrls: string[] = [];
+        // We'll store objects with both the download URL and the original filename
+        const uploadedItems: Array<{ url: string; name?: string }> = [];
         for (let i = 0; i < files.length; i++) {
           try {
             const file = files[i];
-              // create a storage ref under clients/{clientId}/cuotas/{cuotaIndex}/{original filename + unique suffix}
-              // Keep original filename but append a short unique code to avoid overwrites
-              const originalName = file.name;
-              const dotIndex = originalName.lastIndexOf('.');
-              const baseName = dotIndex !== -1 ? originalName.slice(0, dotIndex) : originalName;
-              const ext = dotIndex !== -1 ? originalName.slice(dotIndex) : '';
-              const uniqueCode = `${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
-              const finalName = `${baseName}_${uniqueCode}${ext}`;
-              const path = `clients/${clientId}/cuotas/${cuotaIndex}/${finalName}`;
+            const originalName = file.name;
+            const dotIndex = originalName.lastIndexOf('.');
+            const baseName = dotIndex !== -1 ? originalName.slice(0, dotIndex) : originalName;
+            const ext = dotIndex !== -1 ? originalName.slice(dotIndex) : '';
+            // Append a short unique suffix to the stored file name to avoid collisions in Storage
+            const uniqueCode = `${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+            const finalName = `${baseName}_${uniqueCode}${ext}`;
+            const path = `clients/${clientId}/cuotas/${cuotaIndex}/${finalName}`;
             const sRef = storageRef(storage, path);
             // upload as bytes
             const snapshot = await uploadBytes(sRef, file);
             const url = await getDownloadURL(snapshot.ref);
-            uploadedUrls.push(url);
+            uploadedItems.push({ url, name: originalName });
           } catch (err) {
             console.error('Error subiendo archivo:', err);
             toast.error('Error subiendo uno o más archivos');
           }
         }
 
-        if (uploadedUrls.length > 0) {
-          // Concatenar con existentes si las hay
+        if (uploadedItems.length > 0) {
+          // Concatenar con existentes si las hay. Normalize existing entries to objects of {url,name?}
           const client = clients.find(c => c.id === clientId);
-          const existing = client?.cuotas ? client.cuotas[cuotaIndex]?.[fileType] : undefined;
-          const merged = Array.isArray(existing) ? [...existing, ...uploadedUrls] : (existing ? [existing, ...uploadedUrls] : uploadedUrls);
+          const existingRaw = client?.cuotas ? client.cuotas[cuotaIndex]?.[fileType] : undefined;
+          const normalize = (raw: any): Array<{ url: string; name?: string }> => {
+            if (!raw) return [];
+            if (Array.isArray(raw)) return raw.map(r => (typeof r === 'string' ? { url: r } : r));
+            return (typeof raw === 'string') ? [{ url: raw }] : [raw];
+          };
+          const existing = normalize(existingRaw);
+          const merged = [...existing, ...uploadedItems];
           updateCuota(clientId, cuotaIndex, { [fileType]: merged });
-          toast.success(`${uploadedUrls.length} ${fileType === 'voucher' ? 'voucher(s)' : 'boleta(s)'} subido(s) exitosamente`);
+          toast.success(`${uploadedItems.length} ${fileType === 'voucher' ? 'voucher(s)' : 'boleta(s)'} subido(s) exitosamente`);
         }
       }
     };
@@ -315,34 +322,40 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
 
   const downloadAllFiles = (files: string | string[] | undefined, filenamePrefix: string) => {
     if (!files) return;
-    const arr = Array.isArray(files) ? files : [files];
+    // Normalize to array of objects {url, name?} or strings
+    const arrRaw = Array.isArray(files) ? files : [files];
+    const arr = arrRaw.map(item => (typeof item === 'string' ? { url: item as string } : item)) as Array<{ url: string; name?: string }>;
     // Create a zip-like multiple download by triggering each file download sequentially
     // For cross-origin URLs (Firebase Storage) the `download` attribute may be ignored.
     // Fetch each file as a blob (CORS must allow GET), then create an object URL and force download.
     (async () => {
       for (let i = 0; i < arr.length; i++) {
-        const url = arr[i];
+        const item = arr[i] as { url: string; name?: string };
         try {
-          const res = await fetch(url, { mode: 'cors' });
+          const res = await fetch(item.url, { mode: 'cors' });
           if (!res.ok) throw new Error(`Failed to fetch file: ${res.status}`);
           const blob = await res.blob();
-          // try to get extension from content-type
-          const contentType = blob.type || '';
-          let ext = '';
-          if (contentType) {
-            const parts = contentType.split('/');
-            if (parts.length === 2) ext = '.' + parts[1].split('+')[0];
-          }
-          // fallback to extension from url
-          if (!ext) {
-            const m = url.match(/\.([a-zA-Z0-9]+)(?:\?|$)/);
-            if (m) ext = '.' + m[1];
+          // determine download filename: prefer original name if present
+          let downloadName = item.name;
+          // try to infer extension from content-type or url when name missing
+          if (!downloadName) {
+            const contentType = blob.type || '';
+            let ext = '';
+            if (contentType) {
+              const parts = contentType.split('/');
+              if (parts.length === 2) ext = '.' + parts[1].split('+')[0];
+            }
+            if (!ext) {
+              const m = (item.url).match(/\.([a-zA-Z0-9]+)(?:\?|$)/);
+              if (m) ext = '.' + m[1];
+            }
+            downloadName = `${filenamePrefix}_${i}${ext}`;
           }
 
           const objUrl = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = objUrl;
-          a.download = `${filenamePrefix}_${i}${ext}`;
+          a.download = downloadName;
           document.body.appendChild(a);
           a.click();
           a.remove();
@@ -351,8 +364,9 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
           console.error('Error downloading file', err);
           // Fallback: abrir en nueva pestaña para que el usuario pueda guardar manualmente
           try {
+            const item = arr[i] as { url: string; name?: string };
             const a = document.createElement('a');
-            a.href = url;
+            a.href = item.url;
             a.target = '_blank';
             a.rel = 'noopener noreferrer';
             document.body.appendChild(a);
