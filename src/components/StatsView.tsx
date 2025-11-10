@@ -126,45 +126,35 @@ export default function StatsView({ showReport = false }: StatsViewProps) {
 
     clients.forEach(client => {
       // Determine the effective entry date for the client.
-      // Prefer the fechaPago of the initial cuota (numero === 0) if present — that indicates when the client actually entered.
+      // Use the vencimiento of the initial cuota (numero === 0) if present — the report should be grouped by that vencimiento.
       const initialCuota = client.cuotas ? client.cuotas.find(c => c.numero === 0) : undefined;
-      const entryDate = (initialCuota && initialCuota.fechaPago) ? new Date(initialCuota.fechaPago) : new Date(client.fechaRegistro);
+      const entryDate = (initialCuota && initialCuota.vencimiento) ? new Date(initialCuota.vencimiento) : new Date(client.fechaRegistro);
 
       if (entryDate.getMonth() === month && entryDate.getFullYear() === year) {
         totalClientes++;
 
         if (client.formaPago === 'cuotas') {
           clientesConCuotas++;
-          // Count ingresos por iniciales only if the initial cuota was actually paid in this month
-          if (initialCuota && initialCuota.fechaPago) {
-            // use cuota.monto if available, otherwise fallback to client.inicial
+          // Count ingresos por iniciales based on the initial cuota amount or client.inicial (grouped by vencimiento)
+          if (initialCuota) {
             const inicialAmount = typeof initialCuota.monto === 'number' ? initialCuota.monto : (client.inicial || 0);
             ingresosPorIniciales += inicialAmount;
             totalIngresos += inicialAmount;
+          } else if (client.inicial) {
+            ingresosPorIniciales += client.inicial;
+            totalIngresos += client.inicial;
           }
         } else {
           clientesAlContado++;
-
-          // For contado clients, sum amounts that were paid in this month (cuota.fechaPago inside month/year)
-          let ingresosContadoReal = 0;
-          if (client.cuotas) {
-            client.cuotas.forEach(cuota => {
-              if (cuota.fechaPago) {
-                const fp = new Date(cuota.fechaPago);
-                if (fp.getMonth() === month && fp.getFullYear() === year && cuota.estado === 'pagado') {
-                  ingresosContadoReal += cuota.monto;
-                }
-              }
-            });
-          }
-
-          ingresosPorContado += ingresosContadoReal;
-          totalIngresos += ingresosContadoReal;
+          // For contado clients, attribute an ingreso based on client.inicial if present, otherwise use montoTotal
+          const contadoAmount = client.inicial ?? client.montoTotal ?? 0;
+          ingresosPorContado += contadoAmount;
+          totalIngresos += contadoAmount;
         }
 
         detalleRegistros.push({
-          // Use the initial payment date if present as the "fecha" shown in the report; otherwise fallback to fechaRegistro
-          fecha: (initialCuota && initialCuota.fechaPago) ? initialCuota.fechaPago : client.fechaRegistro,
+          // Use the initial vencimiento if present as the "fecha" shown in the report; otherwise fallback to fechaRegistro
+          fecha: (initialCuota && initialCuota.vencimiento) ? initialCuota.vencimiento : client.fechaRegistro,
           nombre: `${client.nombre1} ${client.nombre2 || ''}`.trim(),
           dni: client.dni1,
           manzana: client.manzana,
