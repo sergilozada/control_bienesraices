@@ -959,9 +959,9 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
                     <Table className="min-w-full table-fixed">
                       <TableHeader>
                         <TableRow>
-                          <TableHead>N°</TableHead>
-                          <TableHead>Vencimiento</TableHead>
-                          <TableHead className="w-36 text-left">Monto</TableHead>
+                  <TableHead className="w-12 sm:w-16 text-left">N°</TableHead>
+                  <TableHead className="w-28 sm:w-32 text-left">Vencimiento</TableHead>
+                  <TableHead className="w-36 sm:w-36 text-left">Monto</TableHead>
                           <TableHead className="w-28 text-left">Mora</TableHead>
                           <TableHead className="w-28 text-left">Total</TableHead>
                           <TableHead className="w-36 text-left">Fecha Pago</TableHead>
@@ -983,15 +983,17 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
                           
                           return (
                             <TableRow key={index}>
-                              <TableCell>
+                              <TableCell className="w-12 sm:w-16 min-w-0">
                                 <Badge variant={cuota.numero === 0 ? 'secondary' : 'outline'}>
                                   {cuota.numero === 0 ? 'Inicial' : cuota.numero}
                                 </Badge>
                               </TableCell>
-                              <TableCell>{formatDate(cuota.vencimiento)}</TableCell>
-                              <TableCell className="w-36 whitespace-nowrap">
+                              <TableCell className="w-28 sm:w-32 min-w-0">
+                                {formatDate(cuota.vencimiento)}
+                              </TableCell>
+                              <TableCell className="w-36 sm:w-36 min-w-0 whitespace-normal sm:whitespace-nowrap">
                                 <div className="flex items-center justify-start space-x-2">
-                                  <span>S/ {cuota.monto.toFixed(2)}</span>
+                                  <span className="truncate">S/ {cuota.monto.toFixed(2)}</span>
                                   <Button size="sm" variant="ghost" onClick={() => { setEditingCuota({ clientId: selectedClient!, type: 'amount', cuotaIndex: index }); setEditMonto(cuota.monto.toFixed(2)); }}>
                                     <Edit className="w-4 h-4" />
                                   </Button>
