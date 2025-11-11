@@ -630,7 +630,7 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
       }
       // Footer: totals and note, placed right after the table (tableEndY)
       try {
-        let footerY = tableEndY;
+  let footerY = tableEndY;
         // If footer would overflow page, add a new page
         const pageH = doc.internal.pageSize.getHeight();
         if (footerY + 30 > pageH - 10) {
@@ -638,8 +638,19 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
           footerY = 20;
         }
         doc.setFontSize(10);
-        const totalPagado = (client.cuotas || []).reduce((acc, c) => acc + ((c.estado === 'pagado') ? (c.total ?? c.monto) : 0), 0);
-        const totalPendiente = (client.cuotas || []).reduce((acc, c) => acc + ((c.estado !== 'pagado') ? (c.total ?? c.monto) : 0), 0);
+        // Compute totals using the same displayed values shown in the modal table:
+        // displayedMora = cuota.numero === 0 ? 0 : (manualMora ? cuota.mora : calculateMora(...))
+        // totalDisplayed = cuota.monto + displayedMora
+        const totalPagado = (client.cuotas || []).reduce((acc, c) => {
+          const moraDisplayed = c.numero === 0 ? 0 : ((typeof c.mora === 'number' && (c as any).manualMora === true) ? c.mora : calculateMora(c.vencimiento, c.monto));
+          const totalDisplayed = (c.monto || 0) + moraDisplayed;
+          return acc + ((c.estado === 'pagado') ? totalDisplayed : 0);
+        }, 0);
+        const totalPendiente = (client.cuotas || []).reduce((acc, c) => {
+          const moraDisplayed = c.numero === 0 ? 0 : ((typeof c.mora === 'number' && (c as any).manualMora === true) ? c.mora : calculateMora(c.vencimiento, c.monto));
+          const totalDisplayed = (c.monto || 0) + moraDisplayed;
+          return acc + ((c.estado !== 'pagado') ? totalDisplayed : 0);
+        }, 0);
         doc.text(`Importe total pagado S/ ${totalPagado.toFixed(2)}`, 20, footerY);
         doc.text(`Importe pendiente S/ ${totalPendiente.toFixed(2)}`, 20, footerY + 6);
         // small green strip below totals
@@ -778,8 +789,17 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
       tableHtml += '</table>';
 
   // Footer note placed directly below the table
-  const totalPagado = (client.cuotas || []).reduce((acc, c) => acc + ((c.estado === 'pagado') ? (c.total ?? c.monto) : 0), 0);
-  const totalPendiente = (client.cuotas || []).reduce((acc, c) => acc + ((c.estado !== 'pagado') ? (c.total ?? c.monto) : 0), 0);
+  // Use same displayed totals as the modal (monto + displayedMora)
+  const totalPagado = (client.cuotas || []).reduce((acc, c) => {
+    const moraDisplayed = c.numero === 0 ? 0 : ((typeof c.mora === 'number' && (c as any).manualMora === true) ? c.mora : calculateMora(c.vencimiento, c.monto));
+    const totalDisplayed = (c.monto || 0) + moraDisplayed;
+    return acc + ((c.estado === 'pagado') ? totalDisplayed : 0);
+  }, 0);
+  const totalPendiente = (client.cuotas || []).reduce((acc, c) => {
+    const moraDisplayed = c.numero === 0 ? 0 : ((typeof c.mora === 'number' && (c as any).manualMora === true) ? c.mora : calculateMora(c.vencimiento, c.monto));
+    const totalDisplayed = (c.monto || 0) + moraDisplayed;
+    return acc + ((c.estado !== 'pagado') ? totalDisplayed : 0);
+  }, 0);
   const footerHtml = `
     <div style="margin-top:8px;">
       <div>Importe total pagado S/ ${totalPagado.toFixed(2)}</div>
