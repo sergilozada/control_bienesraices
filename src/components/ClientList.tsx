@@ -383,8 +383,15 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
 
   const openAllFiles = (files: string | string[] | undefined) => {
     if (!files) return;
-    const arr = Array.isArray(files) ? files : [files];
-    arr.forEach(url => window.open(url, '_blank'));
+    const arrRaw = Array.isArray(files) ? files : [files];
+    const arr = arrRaw.map(item => (typeof item === 'string' ? { url: item } : item)) as Array<{ url: string; name?: string }>;
+    arr.forEach(item => {
+      try {
+        if (item && item.url) window.open(item.url, '_blank');
+      } catch (e) {
+        console.error('openAllFiles error opening file', e);
+      }
+    });
   };
 
   const formatDate = (dateString: string) => {
