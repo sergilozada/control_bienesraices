@@ -64,6 +64,8 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
   const [editingMora, setEditingMora] = useState<{ clientId: string; cuotaIndex: number } | null>(null);
   const [editMoraValue, setEditMoraValue] = useState('');
   const [propagateDates, setPropagateDates] = useState(false);
+  const [overdueMonth, setOverdueMonth] = useState<number | null>(null); // 0-11, null = all
+  const [overdueYear, setOverdueYear] = useState<number>(new Date().getFullYear());
   // Initialize paymentDate as local ISO (yyyy-MM-dd) to avoid timezone shifts
   const [paymentDate, setPaymentDate] = useState(formatLocalISO());
   // Información bancaria reutilizable (evitar inconsistencias)
@@ -95,9 +97,15 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
        // compare dates at local midnight
        const vencMid = new Date(v.getFullYear(), v.getMonth(), v.getDate());
        const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-       return vencMid.getTime() < todayMid.getTime() && 
+       const isOverdue = vencMid.getTime() < todayMid.getTime() && 
                    cuota.estado === 'pendiente' &&
                    cuota.numero > 0; // Excluir iniciales
+       if (!isOverdue) return false;
+       // If a month filter is active, ensure the cuota's vencimiento matches the selected month/year
+       if (overdueMonth !== null) {
+         return v.getMonth() === overdueMonth && v.getFullYear() === overdueYear;
+       }
+       return true;
           })
         );
       default:
@@ -401,6 +409,17 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
     const year = d.getFullYear();
     return `${day}/${month}/${year}`;
   };
+
+  // Prepare month/year options for the overdue filter
+  const monthNames = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Setiembre','Octubre','Noviembre','Diciembre'];
+  const yearsSet = new Set<number>();
+  clients.forEach(c => c.cuotas?.forEach(q => {
+    try { yearsSet.add(parseLocalDate(q.vencimiento).getFullYear()); } catch (e) { /* ignore parse errors */ }
+  }));
+  const availableYears = Array.from(yearsSet).sort((a, b) => b - a);
+  if (availableYears.length === 0) availableYears.push(new Date().getFullYear());
+
+  const resetOverdueFilter = () => { setOverdueMonth(null); setOverdueYear(new Date().getFullYear()); };
 
   const exportToPDF = (client: Client) => {
     (async () => {
@@ -836,6 +855,33 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {filterType === 'overdue' && (
+            <div className="mb-4 flex items-center space-x-3">
+              <Label>Mes de atraso:</Label>
+              <select
+                className="border rounded px-2 py-1"
+                value={overdueMonth === null ? '' : String(overdueMonth)}
+                onChange={(e) => setOverdueMonth(e.target.value === '' ? null : parseInt(e.target.value, 10))}
+              >
+                <option value="">Todos</option>
+                {monthNames.map((m, i) => (
+                  <option key={i} value={i}>{m}</option>
+                ))}
+              </select>
+
+              <select
+                className="border rounded px-2 py-1"
+                value={String(overdueYear)}
+                onChange={(e) => setOverdueYear(parseInt(e.target.value, 10))}
+              >
+                {availableYears.map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+
+              <Button size="sm" variant="outline" onClick={resetOverdueFilter}>Limpiar</Button>
+            </div>
+          )}
           <div className="w-full overflow-x-auto">
             <Table className="min-w-full">
               <TableHeader>
