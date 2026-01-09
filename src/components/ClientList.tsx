@@ -487,12 +487,12 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
   // Left column: client details (separate fields). Right column will show DNIs on same vertical start.
     const infoLineHeight = 6;
     let yInfo = infoStartY;
-  doc.text(`Nombre 1: ${client.nombre1 || ''}`, leftX, yInfo); yInfo += infoLineHeight;
-  if (client.nombre2) { doc.text(`Nombre 2: ${client.nombre2}`, leftX, yInfo); yInfo += infoLineHeight; }
-  doc.text(`Celular 1: ${client.celular1 || ''}`, leftX, yInfo); yInfo += infoLineHeight;
-  if (client.celular2) { doc.text(`Celular 2: ${client.celular2}`, leftX, yInfo); yInfo += infoLineHeight; }
-  doc.text(`Gmail 1: ${client.email1 || ''}`, leftX, yInfo); yInfo += infoLineHeight;
-  if (client.email2) { doc.text(`Gmail 2: ${client.email2}`, leftX, yInfo); yInfo += infoLineHeight; }
+  doc.text(`Nombre: ${client.nombre1 || ''}`, leftX, yInfo); yInfo += infoLineHeight;
+  if (client.nombre2) { doc.text(`Nombre: ${client.nombre2}`, leftX, yInfo); yInfo += infoLineHeight; }
+  doc.text(`Celular: ${client.celular1 || ''}`, leftX, yInfo); yInfo += infoLineHeight;
+  if (client.celular2) { doc.text(`Celular: ${client.celular2}`, leftX, yInfo); yInfo += infoLineHeight; }
+  doc.text(`Gmail: ${client.email1 || ''}`, leftX, yInfo); yInfo += infoLineHeight;
+  if (client.email2) { doc.text(`Gmail: ${client.email2}`, leftX, yInfo); yInfo += infoLineHeight; }
     doc.text(`Precio total: S/ ${client.montoTotal.toFixed(2)}`, leftX, yInfo); yInfo += infoLineHeight;
     doc.text(`Moneda: SOLES`, leftX, yInfo); yInfo += infoLineHeight;
     doc.text(`Proyecto: VILLA HERMOSA DE CARHUAZ`, leftX, yInfo); yInfo += infoLineHeight;
@@ -503,8 +503,8 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
   // Right column: DNIs aligned at top next to names (show second only if present)
   const dniX = rightX + 30;
   let yDni = infoStartY;
-  doc.text(`DNI 1: ${client.dni1 || ''}`, dniX, yDni); yDni += infoLineHeight;
-  if (client.dni2) { doc.text(`DNI 2: ${client.dni2}`, dniX, yDni); }
+  doc.text(`DNI: ${client.dni1 || ''}`, dniX, yDni); yDni += infoLineHeight;
+  if (client.dni2) { doc.text(`DNI: ${client.dni2}`, dniX, yDni); }
 
     // Right column: bank info box (reordered and sized to its content)
   const bankY = infoStartY + (infoLineHeight * 4) + 2; // moved a bit up
