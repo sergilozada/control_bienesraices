@@ -501,7 +501,7 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
     doc.text(`Metraje: ${client.metraje} m2`, leftX, yInfo); yInfo += infoLineHeight;
 
   // Right column: DNIs aligned at top next to names (show second only if present)
-  const dniX = rightX + 2;
+  const dniX = rightX + 30;
   let yDni = infoStartY;
   doc.text(`DNI 1: ${client.dni1 || ''}`, dniX, yDni); yDni += infoLineHeight;
   if (client.dni2) { doc.text(`DNI 2: ${client.dni2}`, dniX, yDni); }
