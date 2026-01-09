@@ -549,18 +549,30 @@ export default function StatsView({ showReport = false }: StatsViewProps) {
           <CardContent className="space-y-6">
             <div className="flex items-center space-x-4">
               <span className="text-sm font-medium">Seleccionar mes:</span>
-              <Select value={`${selectedMonth}-${selectedYear}`} onValueChange={(value) => {
-                const [month, year] = value.split('-');
-                setSelectedMonth(parseInt(month));
-                setSelectedYear(parseInt(year));
+              <Select value={`${selectedMonth}`} onValueChange={(value) => {
+                setSelectedMonth(parseInt(value));
               }}>
                 <SelectTrigger className="w-48">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {monthNames.map((monthName, index) => (
-                    <SelectItem key={index} value={`${index}-${selectedYear}`}>
-                      {monthName} {selectedYear}
+                    <SelectItem key={index} value={`${index}`}>
+                      {monthName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={`${selectedYear}`} onValueChange={(value) => {
+                setSelectedYear(parseInt(value));
+              }}>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 5 + i).map((year) => (
+                    <SelectItem key={year} value={`${year}`}>
+                      {year}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -686,18 +698,30 @@ export default function StatsView({ showReport = false }: StatsViewProps) {
         <CardContent className="space-y-6">
           <div className="flex items-center space-x-4">
             <span className="text-sm font-medium">Estadísticas de</span>
-            <Select value={`${selectedMonth}-${selectedYear}`} onValueChange={(value) => {
-              const [month, year] = value.split('-');
-              setSelectedMonth(parseInt(month));
-              setSelectedYear(parseInt(year));
+            <Select value={`${selectedMonth}`} onValueChange={(value) => {
+              setSelectedMonth(parseInt(value));
             }}>
               <SelectTrigger className="w-48">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {monthNames.map((monthName, index) => (
-                  <SelectItem key={index} value={`${index}-${selectedYear}`}>
-                    {monthName} {selectedYear}
+                  <SelectItem key={index} value={`${index}`}>
+                    {monthName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={`${selectedYear}`} onValueChange={(value) => {
+              setSelectedYear(parseInt(value));
+            }}>
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 5 + i).map((year) => (
+                  <SelectItem key={year} value={`${year}`}>
+                    {year}
                   </SelectItem>
                 ))}
               </SelectContent>
