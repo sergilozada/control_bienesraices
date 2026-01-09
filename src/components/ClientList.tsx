@@ -1008,6 +1008,8 @@ export default function ClientList({ filterType = 'all' }: ClientListProps) {
                     <div><strong>DNI:</strong> {client.dni1}</div>
                     <div><strong>Manzana:</strong> {client.manzana}</div>
                     <div><strong>Lote:</strong> {client.lote}</div>
+                    <div><strong>Email:</strong> {client.email1 || 'N/A'}</div>
+                    <div><strong>Metraje:</strong> {client.metraje} m²</div>
                   </div>
                   
                   <div className="mb-4">
